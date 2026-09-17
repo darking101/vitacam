@@ -1,0 +1,37 @@
+# Build artifacts
+build/
+bin/
+*.elf
+*.velf
+*.self
+*.vpk
+*.sfo
+eboot.bin
+
+# User data and personal photos
+downloaded_photos/
+*.jpg
+*.jpeg
+*.ppm
+
+# Development screenshots & scratch files
+scratch/
+scratch_vita_shots/
+latest_screenshot.png
+screenshot.png
+patch_webserver.py
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Editor & OS files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
