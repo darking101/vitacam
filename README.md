@@ -3,8 +3,12 @@
 [![Platform](https://img.shields.io/badge/Platform-PlayStation%20Vita-blue.svg)](https://github.com/vitasdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Developer](https://img.shields.io/badge/Developer-darking101-00d2ff.svg)](https://github.com/darking101)
+[![Download VPK](https://img.shields.io/badge/Download-vitacam.vpk-2ea44f?style=flat&logo=playstation)](packages/vitacam.vpk?raw=true)
 
 **VitaCam Pro** es una aplicación de cámara avanzada, visor de galería y servidor web Wi-Fi de alta velocidad para la **PlayStation Vita**, desarrollada en C nativo utilizando [VitaSDK](https://vitasdk.org/).
+
+> [!TIP]
+> **¿Quieres probarlo ya en tu PS Vita?** Descarga el archivo instalador directo: [**Descargar vitacam.vpk**](packages/vitacam.vpk?raw=true) e instálalo con VitaShell.
 
 Transforma tu PS Vita en una cámara retro moderna con controles manuales, flash de pantalla frontal, marca de agua adaptativa oficial con fecha y hora, y transferencia inalámbrica directa a tu smartphone o PC mediante código QR sin cables.
 

@@ -4,9 +4,10 @@ bin/
 *.elf
 *.velf
 *.self
-*.vpk
 *.sfo
 eboot.bin
+*.vpk
+!packages/*.vpk
 
 # User data and personal photos
 downloaded_photos/
