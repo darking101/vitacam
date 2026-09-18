@@ -24,6 +24,7 @@ target_link_libraries(vitacam
     ScePgf_stub
     SceAudioIn_stub
     SceAudio_stub
+    SceAppUtil_stub
     SceNet_stub
     SceNetCtl_stub
     png
@@ -38,8 +39,8 @@ include("${VITASDK}/share/vita.cmake" REQUIRED)
 vita_create_self(eboot.bin vitacam UNSAFE TRUE)
 
 vita_create_vpk(vitacam.vpk "VCAM00001" eboot.bin
-    VERSION 01.00
-    NAME "VitaCam"
+    VERSION 02.00
+    NAME "VitaCam Pro"
     FILE sce_sys/icon0.png sce_sys/icon0.png
     FILE sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
     FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png

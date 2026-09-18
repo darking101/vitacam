@@ -33,6 +33,9 @@
 #include "qrcodegen.h"
 #include "font8x8.h"
 #include "psvita_logo.h"
+#include "i18n.h"
+
+AppLanguage g_lang = LANG_EN;
 
 static float get_ux0_free_gb() {
     uint64_t max_size = 0, free_size = 0;
@@ -272,7 +275,7 @@ static void execute_actual_shot(void) {
 static void trigger_camera_shot(void) {
     if (timer_active) {
         timer_active = 0;
-        snprintf(status_msg, sizeof(status_msg), "Temporizador cancelado");
+        snprintf(status_msg, sizeof(status_msg), "%s", LOC("Temporizador cancelado", "Self-timer cancelled"));
         status_msg_color = RGBA8(255, 100, 100, 255);
         status_msg_timer = 60;
         return;
@@ -694,21 +697,21 @@ static void draw_qr_modal(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(pin_box_x, pin_box_y, 1.0f, pin_box_h, RGBA8(0, 160, 255, 140));
     vita2d_draw_rectangle(pin_box_x + pin_box_w - 1.0f, pin_box_y, 1.0f, pin_box_h, RGBA8(0, 160, 255, 140));
 
-    vita2d_pgf_draw_text(pgf, (int)pin_box_x + 14, (int)pin_box_y + 18, RGBA8(160, 195, 240, 220), 0.58f, "PIN DE ACCESO PRIVADO:");
+    vita2d_pgf_draw_text(pgf, (int)pin_box_x + 14, (int)pin_box_y + 18, RGBA8(160, 195, 240, 220), 0.58f, LOC("PIN DE ACCESO PRIVADO:", "PRIVATE ACCESS PIN:"));
 
     char pwd_val_str[64];
     if (pwd[0] != '\0') {
         snprintf(pwd_val_str, sizeof(pwd_val_str), "PIN: %s", pwd);
         vita2d_pgf_draw_text(pgf, (int)pin_box_x + 14, (int)pin_box_y + 42, RGBA8(255, 215, 0, 255), 0.88f, pwd_val_str);
     } else {
-        vita2d_pgf_draw_text(pgf, (int)pin_box_x + 14, (int)pin_box_y + 42, RGBA8(0, 230, 118, 255), 0.70f, "Pública (Sin PIN)");
+        vita2d_pgf_draw_text(pgf, (int)pin_box_x + 14, (int)pin_box_y + 42, RGBA8(0, 230, 118, 255), 0.70f, LOC("Pública (Sin PIN)", "Public (No PIN)"));
     }
 
     // Panel Lateral de Información
     float info_x = mx + 328.0f;
     float info_y = my + 60.0f;
 
-    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 8, RGBA8(170, 190, 230, 220), 0.72f, "Dirección Web en tu red Wi-Fi:");
+    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 8, RGBA8(170, 190, 230, 220), 0.72f, LOC("Dirección Web en tu red Wi-Fi:", "Web Address on Wi-Fi:"));
     
     // URL Bar
     vita2d_draw_rectangle(info_x, info_y + 18.0f, 364.0f, 42.0f, RGBA8(8, 12, 28, 230));
@@ -719,11 +722,11 @@ static void draw_qr_modal(vita2d_pgf *pgf) {
 
     vita2d_pgf_draw_text(pgf, (int)info_x + 14, (int)info_y + 46, RGBA8(0, 220, 255, 255), 0.84f, clean_url_str);
 
-    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 84, RGBA8(240, 245, 255, 240), 0.72f, "Instrucciones de conexión:");
-    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 110, RGBA8(160, 180, 215, 220), 0.65f, "• Escanea el QR para entrar directo sin escribir clave.");
-    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 134, RGBA8(160, 180, 215, 220), 0.65f, "• O entra a la URL e ingresa el PIN mostrado abajo.");
-    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 158, RGBA8(160, 180, 215, 220), 0.65f, "• Pulsa 'Nuevo PIN' para cambiar clave y revocar accesos.");
-    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 182, RGBA8(160, 180, 215, 220), 0.65f, "• El servidor continúa activo en segundo plano.");
+    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 84, RGBA8(240, 245, 255, 240), 0.72f, LOC("Instrucciones de conexión:", "Connection instructions:"));
+    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 110, RGBA8(160, 180, 215, 220), 0.65f, LOC("• Escanea el QR para entrar directo sin escribir clave.", "• Scan QR code to connect without typing password."));
+    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 134, RGBA8(160, 180, 215, 220), 0.65f, LOC("• O entra a la URL e ingresa el PIN mostrado abajo.", "• Or open URL and enter the PIN shown below."));
+    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 158, RGBA8(160, 180, 215, 220), 0.65f, LOC("• Pulsa 'Nuevo PIN' para cambiar clave y revocar accesos.", "• Press 'New PIN' to rotate key and revoke access."));
+    vita2d_pgf_draw_text(pgf, (int)info_x, (int)info_y + 182, RGBA8(160, 180, 215, 220), 0.65f, LOC("• El servidor continúa activo en segundo plano.", "• Server keeps running in background."));
 
     // Botones de acción navegables con D-Pad, Joystick y Táctil
     float btn_y = my + mh - 56.0f;
@@ -734,7 +737,7 @@ static void draw_qr_modal(vita2d_pgf *pgf) {
     float btn2_x = info_x + 246.0f;
 
     // Botón 0: Encender / Apagar Servidor
-    const char *toggle_lbl = webserver_is_enabled() ? "Apagar" : "Activar";
+    const char *toggle_lbl = webserver_is_enabled() ? LOC("Apagar", "Turn Off") : LOC("Activar", "Enable");
     if (wifi_dialog_focused == 0) {
         draw_centered_pill_button(pgf, btn0_x, btn_y, btn_w, btn_h, ICON_CROSS,
                                  toggle_lbl, 0.70f, RGBA8(255, 255, 255, 255),
@@ -749,22 +752,22 @@ static void draw_qr_modal(vita2d_pgf *pgf) {
     // Botón 1: Nuevo PIN
     if (wifi_dialog_focused == 1) {
         draw_centered_pill_button(pgf, btn1_x, btn_y, btn_w, btn_h, ICON_CROSS,
-                                 "Nuevo PIN", 0.68f, RGBA8(255, 255, 255, 255),
+                                 LOC("Nuevo PIN", "New PIN"), 0.68f, RGBA8(255, 255, 255, 255),
                                  RGBA8(210, 140, 0, 245), RGBA8(255, 255, 255, 240));
     } else {
         draw_centered_pill_button(pgf, btn1_x, btn_y, btn_w, btn_h, ICON_NONE,
-                                 "Nuevo PIN", 0.68f, RGBA8(180, 195, 225, 220),
+                                 LOC("Nuevo PIN", "New PIN"), 0.68f, RGBA8(180, 195, 225, 220),
                                  RGBA8(20, 28, 54, 200), RGBA8(40, 60, 110, 160));
     }
 
     // Botón 2: Cerrar
     if (wifi_dialog_focused == 2) {
         draw_centered_pill_button(pgf, btn2_x, btn_y, btn_w, btn_h, ICON_CROSS,
-                                 "Cerrar", 0.70f, RGBA8(255, 255, 255, 255),
+                                 LOC("Cerrar", "Close"), 0.70f, RGBA8(255, 255, 255, 255),
                                  RGBA8(40, 65, 125, 250), RGBA8(255, 255, 255, 240));
     } else {
         draw_centered_pill_button(pgf, btn2_x, btn_y, btn_w, btn_h, ICON_NONE,
-                                 "Cerrar", 0.70f, RGBA8(180, 195, 225, 220),
+                                 LOC("Cerrar", "Close"), 0.70f, RGBA8(180, 195, 225, 220),
                                  RGBA8(20, 28, 54, 200), RGBA8(40, 60, 110, 160));
     }
 }
@@ -787,8 +790,8 @@ static void draw_info_modal(vita2d_pgf *pgf) {
     float tw_t = vita2d_pgf_text_width(pgf, 0.95f, "VitaCam Pro");
     vita2d_pgf_draw_text(pgf, (int)(dx + (dw - tw_t) * 0.5f), (int)dy + 38, RGBA8(0, 210, 255, 255), 0.95f, "VitaCam Pro");
 
-    float tw_sub = vita2d_pgf_text_width(pgf, 0.56f, "Camara Avanzada, Galeria & Servidor Wi-Fi para PS Vita");
-    vita2d_pgf_draw_text(pgf, (int)(dx + (dw - tw_sub) * 0.5f), (int)dy + 58, RGBA8(180, 195, 225, 210), 0.56f, "Camara Avanzada, Galeria & Servidor Wi-Fi para PS Vita");
+    float tw_sub = vita2d_pgf_text_width(pgf, 0.56f, LOC("Cámara Avanzada, Galería & Servidor Wi-Fi para PS Vita", "Advanced Camera, Gallery & Wi-Fi Server for PS Vita"));
+    vita2d_pgf_draw_text(pgf, (int)(dx + (dw - tw_sub) * 0.5f), (int)dy + 58, RGBA8(180, 195, 225, 210), 0.56f, LOC("Cámara Avanzada, Galería & Servidor Wi-Fi para PS Vita", "Advanced Camera, Gallery & Wi-Fi Server for PS Vita"));
 
     // Tarjeta destacada de Autor / Desarrollador: darking101
     float ab_w = dw - 44.0f, ab_h = 56.0f, ab_x = dx + 22.0f, ab_y = dy + 72.0f;
@@ -798,30 +801,30 @@ static void draw_info_modal(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(ab_x, ab_y, 1.0f, ab_h, RGBA8(245, 197, 24, 210));
     vita2d_draw_rectangle(ab_x + ab_w - 1.0f, ab_y, 1.0f, ab_h, RGBA8(245, 197, 24, 210));
 
-    vita2d_pgf_draw_text(pgf, (int)ab_x + 16, (int)ab_y + 24, RGBA8(245, 197, 24, 255), 0.68f, "Desarrollado y Creado por: darking101");
+    vita2d_pgf_draw_text(pgf, (int)ab_x + 16, (int)ab_y + 24, RGBA8(245, 197, 24, 255), 0.68f, LOC("Desarrollado y Creado por: darking101", "Developed & Created by: darking101"));
     vita2d_pgf_draw_text(pgf, (int)ab_x + 16, (int)ab_y + 46, RGBA8(160, 215, 255, 230), 0.58f, "GitHub: https://github.com/darking101/vitacam");
 
     // Atajos y controles del sistema
     float sy = ab_y + ab_h + 22.0f;
-    vita2d_pgf_draw_text(pgf, (int)dx + 24, (int)sy, RGBA8(255, 255, 255, 245), 0.64f, "Guia de Atajos y Controles:");
+    vita2d_pgf_draw_text(pgf, (int)dx + 24, (int)sy, RGBA8(255, 255, 255, 245), 0.64f, LOC("Guía de Atajos y Controles:", "Shortcuts & Controls Guide:"));
     sy += 22.0f;
-    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Gatillo R / Touch: Disparador con Sello oficial [PS] VITA adaptativo.");
+    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, LOC("- Gatillo R / Touch: Disparador con Sello oficial [PS] VITA adaptativo.", "- R Trigger / Touch: Shutter with adaptive [PS] VITA watermark."));
     sy += 20.0f;
-    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Cuadrado: Modo seleccion multiple en Galeria (borrado en lote).");
+    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, LOC("- Cuadrado: Modo selección múltiple en Galería (borrado en lote).", "- Square: Multi-select mode in Gallery (batch delete)."));
     sy += 20.0f;
-    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Triangulo: Servidor Web Wi-Fi con enlace directo por Codigo QR.");
+    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, LOC("- Triángulo: Servidor Web Wi-Fi con enlace directo por Código QR.", "- Triangle: Wi-Fi Web Server with direct QR Code link."));
     sy += 20.0f;
-    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Select: Conmutar camara Trasera / Frontal (con Softbox blanco).");
+    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, LOC("- Select: Conmutar cámara Trasera / Frontal (con Softbox blanco).", "- Select: Switch Rear / Front camera (with white Softbox)."));
     sy += 20.0f;
-    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Gatillos L / R en Galeria: Conmutar origen (VitaCam / Fotos / Capturas).");
+    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, LOC("- Gatillos L / R en Galería: Conmutar origen (VitaCam / Fotos / Capturas).", "- L / R Triggers in Gallery: Switch tab (VitaCam / Photos / Captures)."));
     sy += 20.0f;
-    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Stick / Pellizco tactil: Zoom dinamico de 1.0x a 4.0x en camara y galeria.");
+    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, LOC("- Stick / Pellizco táctil: Zoom dinámico de 1.0x a 4.0x en cámara y galería.", "- Stick / Touch Pinch: Dynamic zoom 1.0x to 4.0x in camera & gallery."));
     sy += 20.0f;
     struct mallinfo mi = mallinfo();
     float heap_mb = (float)mi.uordblks / (1024.0f * 1024.0f);
     float total_ram_mb = heap_mb + 4.0f + 6.8f;
     char ram_str[96];
-    snprintf(ram_str, sizeof(ram_str), "- Memoria RAM en uso: ~%.1f MB / 448 MB (Ultra ligera y optimizada)", total_ram_mb);
+    snprintf(ram_str, sizeof(ram_str), LOC("- Memoria RAM en uso: ~%.1f MB / 448 MB (Ultra ligera)", "- RAM memory in use: ~%.1f MB / 448 MB (Ultra lightweight)"), total_ram_mb);
     vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(0, 220, 255, 240), 0.54f, ram_str);
 
     // Botón Cerrar interactivo
@@ -829,7 +832,7 @@ static void draw_info_modal(vita2d_pgf *pgf) {
     float cb_x = dx + (dw - cb_w) * 0.5f;
     float cb_y = dy + dh - 48.0f;
     draw_centered_pill_button(pgf, cb_x, cb_y, cb_w, cb_h, ICON_CROSS,
-                             "Cerrar", 0.70f, RGBA8(255, 255, 255, 255),
+                             LOC("Cerrar", "Close"), 0.70f, RGBA8(255, 255, 255, 255),
                              RGBA8(35, 55, 115, 250), RGBA8(0, 210, 255, 240));
 }
 
@@ -961,7 +964,7 @@ static char zoom_names[31][16];
 
 static void init_camera_params_table(void) {
     // 0. EV (-2.0 EV a +2.0 EV en pasos finos de 0.1)
-    params[0].name = "EV (Exposicion)";
+    params[0].name = LOC("EV (Exposición)", "EV (Exposure)");
     params[0].num_options = 41;
     params[0].default_idx = 20;
     params[0].current_idx = 20;
@@ -989,7 +992,7 @@ static void init_camera_params_table(void) {
     params[1].query_func = sceCameraGetISO;
 
     // 2. Framerate / FPS (15, 20, 30, 60)
-    params[2].name = "Velocidad (FPS)";
+    params[2].name = LOC("Velocidad (FPS)", "Framerate (FPS)");
     params[2].num_options = 4;
     params[2].default_idx = 2; // 30 FPS por defecto
     params[2].current_idx = 2;
@@ -1001,19 +1004,19 @@ static void init_camera_params_table(void) {
     params[2].query_func = NULL;
 
     // 3. White Balance (AUTO, SOL, FRIO, CALIDO)
-    params[3].name = "Balance Blancos";
+    params[3].name = LOC("Balance Blancos", "White Balance");
     params[3].num_options = 4;
     params[3].default_idx = 0;
     params[3].current_idx = 0;
     params[3].option_names[0] = "AUTO";   params[3].option_values[0] = SCE_CAMERA_WB_AUTO;
-    params[3].option_names[1] = "SOL";    params[3].option_values[1] = SCE_CAMERA_WB_DAY;
-    params[3].option_names[2] = "FRIO";   params[3].option_values[2] = SCE_CAMERA_WB_CWF;
-    params[3].option_names[3] = "CALIDO"; params[3].option_values[3] = SCE_CAMERA_WB_SLSA;
+    params[3].option_names[1] = LOC("SOL", "SUN");    params[3].option_values[1] = SCE_CAMERA_WB_DAY;
+    params[3].option_names[2] = LOC("FRÍO", "COOL");   params[3].option_values[2] = SCE_CAMERA_WB_CWF;
+    params[3].option_names[3] = LOC("CÁLIDO", "WARM"); params[3].option_values[3] = SCE_CAMERA_WB_SLSA;
     params[3].apply_func = apply_wb;
     params[3].query_func = sceCameraGetWhiteBalance;
 
     // 4. Zoom Digital Suave (1.0x hasta 4.0x en incrementos de 0.1x)
-    params[4].name = "Zoom Digital";
+    params[4].name = LOC("Zoom Digital", "Digital Zoom");
     params[4].num_options = 31;
     params[4].default_idx = 0;
     params[4].current_idx = 0;
@@ -1027,7 +1030,7 @@ static void init_camera_params_table(void) {
     }
 
     // 5. Nitidez (Sharpness)
-    params[5].name = "Nitidez";
+    params[5].name = LOC("Nitidez", "Sharpness");
     params[5].num_options = 4;
     params[5].default_idx = 0;
     params[5].current_idx = 0;
@@ -1039,7 +1042,7 @@ static void init_camera_params_table(void) {
     params[5].query_func = sceCameraGetSharpness;
 
     // 6. Saturación
-    params[6].name = "Saturacion";
+    params[6].name = LOC("Saturación", "Saturation");
     params[6].num_options = 5;
     params[6].default_idx = 2;
     params[6].current_idx = 2;
@@ -1052,22 +1055,22 @@ static void init_camera_params_table(void) {
     params[6].query_func = sceCameraGetSaturation;
 
     // 7. Filtros / Efectos
-    params[7].name = "Filtro / Efecto";
+    params[7].name = LOC("Filtro / Efecto", "Filter / Effect");
     params[7].num_options = 7;
     params[7].default_idx = 0;
     params[7].current_idx = 0;
     params[7].option_names[0] = "NORM";  params[7].option_values[0] = SCE_CAMERA_EFFECT_NORMAL;
     params[7].option_names[1] = "NEG";   params[7].option_values[1] = SCE_CAMERA_EFFECT_NEGATIVE;
-    params[7].option_names[2] = "B/N";   params[7].option_values[2] = SCE_CAMERA_EFFECT_BLACKWHITE;
+    params[7].option_names[2] = LOC("B/N", "B/W");   params[7].option_values[2] = SCE_CAMERA_EFFECT_BLACKWHITE;
     params[7].option_names[3] = "SEPIA"; params[7].option_values[3] = SCE_CAMERA_EFFECT_SEPIA;
-    params[7].option_names[4] = "AZUL";  params[7].option_values[4] = SCE_CAMERA_EFFECT_BLUE;
-    params[7].option_names[5] = "ROJO";  params[7].option_values[5] = SCE_CAMERA_EFFECT_RED;
-    params[7].option_names[6] = "VERDE"; params[7].option_values[6] = SCE_CAMERA_EFFECT_GREEN;
+    params[7].option_names[4] = LOC("AZUL", "BLUE");  params[7].option_values[4] = SCE_CAMERA_EFFECT_BLUE;
+    params[7].option_names[5] = LOC("ROJO", "RED");  params[7].option_values[5] = SCE_CAMERA_EFFECT_RED;
+    params[7].option_names[6] = LOC("VERDE", "GREEN"); params[7].option_values[6] = SCE_CAMERA_EFFECT_GREEN;
     params[7].apply_func = apply_effect;
     params[7].query_func = sceCameraGetEffect;
 
     // 8. Bloqueo AE/AWB
-    params[8].name = "Bloqueo AE/AWB";
+    params[8].name = LOC("Bloqueo AE/AWB", "AE/AWB Lock");
     params[8].num_options = 2;
     params[8].default_idx = 0;
     params[8].current_idx = 0;
@@ -1146,7 +1149,7 @@ static void switch_camera_device() {
         sceKernelStartThread(cam_thid, 0, NULL);
     }
 
-    snprintf(status_msg, sizeof(status_msg), "CÁMARA: %s", (cam_dev == SCE_CAMERA_DEVICE_BACK) ? "POSTERIOR" : "FRONTAL");
+    snprintf(status_msg, sizeof(status_msg), "%s: %s", LOC("CÁMARA", "CAMERA"), (cam_dev == SCE_CAMERA_DEVICE_BACK) ? LOC("POSTERIOR", "REAR") : LOC("FRONTAL", "FRONT"));
     status_msg_color = RGBA8(245, 197, 24, 255);
     status_msg_timer = 90;
 }
@@ -2209,7 +2212,7 @@ static void gallery_delete_selected() {
             }
         }
         sceIoRemove(gallery_photos[gallery_idx].fullpath);
-        snprintf(status_msg, sizeof(status_msg), "ELEMENTO ELIMINADO: %s", deleted_name);
+        snprintf(status_msg, sizeof(status_msg), "%s: %s", LOC("ELEMENTO ELIMINADO", "ITEM DELETED"), deleted_name);
     } else {
         for (int i = 0; i < gallery_count; i++) {
             if (gallery_selected[i]) {
@@ -2226,7 +2229,7 @@ static void gallery_delete_selected() {
                 gallery_selected[i] = 0;
             }
         }
-        snprintf(status_msg, sizeof(status_msg), "ELIMINADOS %d ELEMENTOS", sel_count);
+        snprintf(status_msg, sizeof(status_msg), LOC("ELIMINADOS %d ELEMENTOS", "DELETED %d ITEMS"), sel_count);
     }
 
     status_msg_color = RGBA8(255, 140, 40, 255);
@@ -2375,7 +2378,7 @@ static void handle_camera_touch() {
             if (!touch_is_dragging) {
                 if (timer_active) {
                     timer_active = 0;
-                    snprintf(status_msg, sizeof(status_msg), "Temporizador cancelado");
+                    snprintf(status_msg, sizeof(status_msg), "%s", LOC("Temporizador cancelado", "Self-timer cancelled"));
                     status_msg_color = RGBA8(255, 100, 100, 255);
                     status_msg_timer = 60;
                     touch_active = 0;
@@ -2402,20 +2405,20 @@ static void handle_camera_touch() {
                 // 5. Botón Flash (Siempre presente) - Barra Lateral Izquierda (x: 0 - 118, y: 76 - 134)
                 else if (tx >= 0 && tx <= 118 && ty >= 76 && ty <= 134) {
                     if (cam_dev == SCE_CAMERA_DEVICE_BACK) {
-                        snprintf(status_msg, sizeof(status_msg), "Flash no disponible en camara trasera (sin LED)");
+                        snprintf(status_msg, sizeof(status_msg), "%s", LOC("Flash no disponible en cámara trasera (sin LED)", "Flash not available on rear camera (no LED)"));
                         status_msg_color = RGBA8(255, 140, 60, 255);
                         status_msg_timer = 90;
                     } else {
                         front_flash_mode = (front_flash_mode + 1) % FRONT_FLASH_COUNT;
                         save_user_settings();
                         if (front_flash_mode == FRONT_FLASH_OFF) {
-                            snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Desactivado");
+                            snprintf(status_msg, sizeof(status_msg), "%s", LOC("Flash Frontal: Desactivado", "Front Flash: Disabled"));
                             status_msg_color = RGBA8(180, 190, 210, 255);
                         } else if (front_flash_mode == FRONT_FLASH_SCREEN) {
-                            snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Pantalla Completa (Disparo Blanco)");
+                            snprintf(status_msg, sizeof(status_msg), "%s", LOC("Flash Frontal: Pantalla Completa (Disparo Blanco)", "Front Flash: Full Screen (White Shot)"));
                             status_msg_color = RGBA8(255, 215, 60, 255);
                         } else {
-                            snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Anillo de Luz (Marco Iluminado)");
+                            snprintf(status_msg, sizeof(status_msg), "%s", LOC("Flash Frontal: Anillo de Luz (Marco Iluminado)", "Front Flash: Ring Light (Illuminated Frame)"));
                             status_msg_color = RGBA8(255, 255, 255, 255);
                         }
                         status_msg_timer = 90;
@@ -2424,7 +2427,7 @@ static void handle_camera_touch() {
                 // 5b. Botón Marca de Agua (Watermark) - Barra Lateral Izquierda (x: 0 - 118, y: 135 - 193)
                 else if (tx >= 0 && tx <= 118 && ty >= 135 && ty <= 193) {
                     watermark_enabled = !watermark_enabled;
-                    snprintf(status_msg, sizeof(status_msg), "Marca de Agua: %s (Tomada con PS Vita)", watermark_enabled ? "Activada" : "Desactivada");
+                    snprintf(status_msg, sizeof(status_msg), "%s: %s", LOC("Marca de Agua", "Watermark"), watermark_enabled ? LOC("Activada", "Enabled") : LOC("Desactivada", "Disabled"));
                     status_msg_color = watermark_enabled ? RGBA8(0, 220, 255, 255) : RGBA8(180, 190, 210, 255);
                     status_msg_timer = 90;
                 }
@@ -2432,7 +2435,7 @@ static void handle_camera_touch() {
                 else if (tx >= 0 && tx <= 118 && ty >= 194 && ty <= 250) {
                     sound_enabled = !sound_enabled;
                     save_user_settings();
-                    snprintf(status_msg, sizeof(status_msg), "Sonido Obturador: %s", sound_enabled ? "Activado" : "Silenciado");
+                    snprintf(status_msg, sizeof(status_msg), "%s: %s", LOC("Sonido Obturador", "Shutter Sound"), sound_enabled ? LOC("Activado", "Enabled") : LOC("Silenciado", "Muted"));
                     status_msg_color = sound_enabled ? RGBA8(0, 220, 255, 255) : RGBA8(255, 100, 100, 255);
                     status_msg_timer = 90;
                     if (sound_enabled) sound_req_beep = 1;
@@ -2445,10 +2448,10 @@ static void handle_camera_touch() {
                     else timer_mode = 0;
                     save_user_settings();
                     if (timer_mode == 0) {
-                        snprintf(status_msg, sizeof(status_msg), "Temporizador: Desactivado");
+                        snprintf(status_msg, sizeof(status_msg), "%s", LOC("Temporizador: Desactivado", "Self-Timer: Disabled"));
                         status_msg_color = RGBA8(180, 190, 210, 255);
                     } else {
-                        snprintf(status_msg, sizeof(status_msg), "Temporizador: %d Segundos", timer_mode);
+                        snprintf(status_msg, sizeof(status_msg), LOC("Temporizador: %d Segundos", "Self-Timer: %d Seconds"), timer_mode);
                         status_msg_color = RGBA8(0, 220, 255, 255);
                     }
                     status_msg_timer = 90;
@@ -2460,10 +2463,10 @@ static void handle_camera_touch() {
                     else burst_mode = 0;
                     save_user_settings();
                     if (burst_mode == 0) {
-                        snprintf(status_msg, sizeof(status_msg), "Ráfaga: Desactivada");
+                        snprintf(status_msg, sizeof(status_msg), "%s", LOC("Ráfaga: Desactivada", "Burst: Disabled"));
                         status_msg_color = RGBA8(180, 190, 210, 255);
                     } else {
-                        snprintf(status_msg, sizeof(status_msg), "Ráfaga: %d Fotos Consecutivas", burst_mode);
+                        snprintf(status_msg, sizeof(status_msg), LOC("Ráfaga: %d Fotos Consecutivas", "Burst: %d Consecutive Shots"), burst_mode);
                         status_msg_color = RGBA8(0, 220, 255, 255);
                     }
                     status_msg_timer = 90;
@@ -3202,11 +3205,11 @@ static void capture_and_save_photo() {
 
             if (written == total_expected) {
                 if (burst_remaining > 1) {
-                    snprintf(status_msg, sizeof(status_msg), "RAFAGA: FOTO %d DE %d GUARDADA", burst_mode - burst_remaining + 1, burst_mode);
+                    snprintf(status_msg, sizeof(status_msg), LOC("RÁFAGA: FOTO %d DE %d GUARDADA", "BURST: PHOTO %d OF %d SAVED"), burst_mode - burst_remaining + 1, burst_mode);
                 } else if (burst_mode > 0) {
-                    snprintf(status_msg, sizeof(status_msg), "RAFAGA COMPLETADA (%d FOTOS) • EXIF", burst_mode);
+                    snprintf(status_msg, sizeof(status_msg), LOC("RÁFAGA COMPLETADA (%d FOTOS) • EXIF", "BURST COMPLETED (%d PHOTOS) • EXIF"), burst_mode);
                 } else {
-                    snprintf(status_msg, sizeof(status_msg), "FOTO GUARDADA (%d KB) • EXIF", total_expected / 1024);
+                    snprintf(status_msg, sizeof(status_msg), LOC("FOTO GUARDADA (%d KB) • EXIF", "PHOTO SAVED (%d KB) • EXIF"), total_expected / 1024);
                 }
                 status_msg_color = RGBA8(60, 255, 120, 255);
                 status_msg_timer = 90;
@@ -3579,6 +3582,7 @@ static int cam_worker_thread(SceSize args, void *argp) {
 // Main Entrypoint
 // =========================================================================
 int main() {
+    i18n_init();
     // 1. Reloj de CPU a 444 MHz y Carga de Módulos
     scePowerSetArmClockFrequency(444);
     scePowerSetBusClockFrequency(222);
@@ -3788,7 +3792,7 @@ int main() {
             if (timer_active) {
                 if (pressed & SCE_CTRL_CIRCLE) {
                     timer_active = 0;
-                    snprintf(status_msg, sizeof(status_msg), "Temporizador cancelado");
+                    snprintf(status_msg, sizeof(status_msg), "%s", LOC("Temporizador cancelado", "Self-timer cancelled"));
                     status_msg_color = RGBA8(255, 100, 100, 255);
                     status_msg_timer = 60;
                 } else {
@@ -4094,8 +4098,9 @@ int main() {
                 unsigned int val_col = is_active ? RGBA8(255, 255, 255, 255) : RGBA8(215, 225, 240, 220);
 
                 // Título del parámetro
-                float tw_title = vita2d_pgf_text_width(pgf, 0.58f, pro_bar_labels[i]);
-                vita2d_pgf_draw_text(pgf, (int)(item_x + (item_w - tw_title) * 0.5f), (int)pb_y + 18, title_col, 0.58f, pro_bar_labels[i]);
+                const char *cur_lbl = (i == 4 ? LOC("EFECTO", "EFFECT") : pro_bar_labels[i]);
+                float tw_title = vita2d_pgf_text_width(pgf, 0.58f, cur_lbl);
+                vita2d_pgf_draw_text(pgf, (int)(item_x + (item_w - tw_title) * 0.5f), (int)pb_y + 18, title_col, 0.58f, cur_lbl);
 
                 // Valor abreviado del parámetro
                 const char *cur_v_str = p->option_names[p->current_idx];
@@ -4417,7 +4422,7 @@ int main() {
                 float tw_n = vita2d_pgf_text_width(pgf, 2.4f, num_str);
                 vita2d_pgf_draw_text(pgf, (int)(ccx - tw_n * 0.5f), (int)ccy + 26, RGBA8(255, 255, 255, 255), 2.4f, num_str);
 
-                const char *hint = "[ O ] o tocar pantalla para cancelar";
+                const char *hint = LOC("[ O ] o tocar pantalla para cancelar", "[ O ] or tap screen to cancel");
                 float tw_h = vita2d_pgf_text_width(pgf, 0.72f, hint);
                 vita2d_pgf_draw_text(pgf, (int)(ccx - tw_h * 0.5f), (int)(ccy + cr + 38.0f), RGBA8(210, 225, 255, 230), 0.72f, hint);
             }
@@ -4729,17 +4734,17 @@ int main() {
                     vita2d_draw_rectangle(card_x, card_y, 1.0f, card_h, RGBA8(38, 58, 115, 180));
                     vita2d_draw_rectangle(card_x + card_w - 1.0f, card_y, 1.0f, card_h, RGBA8(38, 58, 115, 180));
 
-                    const char *empty_msg = "No se encontraron fotos en esta seccion";
-                    if (gallery_source_tab == GALLERY_SOURCE_VITACAM) empty_msg = "No hay fotos tomadas con VitaCam";
-                    else if (gallery_source_tab == GALLERY_SOURCE_PHOTO) empty_msg = "No hay fotos de la camara oficial (ux0:photo)";
-                    else if (gallery_source_tab == GALLERY_SOURCE_SCREENSHOT) empty_msg = "No hay capturas de pantalla (Screenshots)";
-                    else empty_msg = "No se encontraron fotos en la consola";
+                    const char *empty_msg = LOC("No se encontraron fotos en esta sección", "No photos found in this section");
+                    if (gallery_source_tab == GALLERY_SOURCE_VITACAM) empty_msg = LOC("No hay fotos tomadas con VitaCam", "No photos taken with VitaCam");
+                    else if (gallery_source_tab == GALLERY_SOURCE_PHOTO) empty_msg = LOC("No hay fotos de la cámara oficial (ux0:photo)", "No photos from official camera (ux0:photo)");
+                    else if (gallery_source_tab == GALLERY_SOURCE_SCREENSHOT) empty_msg = LOC("No hay capturas de pantalla (Screenshots)", "No screenshots found (ux0:picture)");
+                    else empty_msg = LOC("No se encontraron fotos en la consola", "No photos found on the console");
 
                     float tw_empty = vita2d_pgf_text_width(pgf, 0.76f, empty_msg);
                     vita2d_pgf_draw_text(pgf, (int)(card_x + (card_w - tw_empty) * 0.5f), (int)(card_y + 44),
                                          RGBA8(240, 245, 255, 255), 0.76f, empty_msg);
 
-                    const char *empty_sub = "Usa los gatillos L / R o las pestañas inferiores para cambiar";
+                    const char *empty_sub = LOC("Usa los gatillos L / R o las pestañas inferiores para cambiar", "Use L / R triggers or bottom tabs to switch");
                     float tw_sub = vita2d_pgf_text_width(pgf, 0.62f, empty_sub);
                     vita2d_pgf_draw_text(pgf, (int)(card_x + (card_w - tw_sub) * 0.5f), (int)(card_y + 76),
                                          RGBA8(140, 165, 210, 220), 0.62f, empty_sub);
@@ -4891,7 +4896,7 @@ int main() {
 
                     // Contador central
                     char sel_txt[32];
-                    snprintf(sel_txt, sizeof(sel_txt), "%d seleccionadas", sel_count);
+                    snprintf(sel_txt, sizeof(sel_txt), LOC("%d seleccionadas", "%d selected"), sel_count);
                     float tw_sel = vita2d_pgf_text_width(pgf, 0.80f, sel_txt);
                     vita2d_pgf_draw_text(pgf, (int)((960.0f - tw_sel) * 0.5f), 30,
                                          RGBA8(240, 245, 255, 255), 0.80f, sel_txt);
@@ -4899,7 +4904,7 @@ int main() {
                     // Borrar seleccionadas (Pill roja a la derecha)
                     if (sel_count > 0) {
                         char del_btn_txt[32];
-                        snprintf(del_btn_txt, sizeof(del_btn_txt), "Borrar (%d)", sel_count);
+                        snprintf(del_btn_txt, sizeof(del_btn_txt), LOC("Borrar (%d)", "Delete (%d)"), sel_count);
                         draw_centered_pill_button(pgf, 810.0f, 8.0f, 138.0f, 32.0f, ICON_TRASH,
                                                  del_btn_txt, 0.72f, RGBA8(255, 255, 255, 255),
                                                  RGBA8(210, 36, 36, 240), RGBA8(255, 90, 90, 160));
@@ -4908,13 +4913,13 @@ int main() {
                     // ── Header Modo Normal
                     // Botón Cámara (izquierda)
                     draw_centered_pill_button(pgf, 12.0f, 8.0f, 108.0f, 32.0f, ICON_CAMERA,
-                                             "Cámara", 0.72f, RGBA8(240, 245, 255, 255),
+                                             LOC("Cámara", "Camera"), 0.72f, RGBA8(240, 245, 255, 255),
                                              RGBA8(24, 34, 64, 230), RGBA8(45, 68, 125, 200));
 
                     // Badge de Elementos y Espacio Libre en ux0:
                     float free_gb = get_ux0_free_gb();
                     char info_badge[64];
-                    snprintf(info_badge, sizeof(info_badge), "%d fotos • %.1f GB libres", gallery_count, free_gb);
+                    snprintf(info_badge, sizeof(info_badge), LOC("%d fotos • %.1f GB libres", "%d photos • %.1f GB free"), gallery_count, free_gb);
                     draw_centered_pill_button(pgf, 128.0f, 8.0f, 220.0f, 32.0f, (IconId)-1,
                                              info_badge, 0.68f, RGBA8(200, 215, 245, 230),
                                              RGBA8(16, 22, 46, 210), RGBA8(35, 52, 100, 180));
@@ -5003,9 +5008,9 @@ int main() {
                     // 4 Pestañas limpias (sin texto L / R estorbando)
                     struct { const char *name; float x; float w; } tabs_info[4] = {
                         { "VitaCam",     bar_x + 6.0f,   115.0f },
-                        { "Fotos Vita",  bar_x + 125.0f, 120.0f },
+                        { LOC("Fotos Vita", "Vita Photos"), bar_x + 125.0f, 120.0f },
                         { "Screenshots", bar_x + 249.0f, 135.0f },
-                        { "Todo",        bar_x + 388.0f, 106.0f }
+                        { LOC("Todo", "All"), bar_x + 388.0f, 106.0f }
                     };
 
                     for (int t = 0; t < 4; t++) {
@@ -5031,11 +5036,11 @@ int main() {
 
                 if (gallery_selection_mode) {
                     draw_icon_label(pgf, 480.0f, bb_y + 4.0f, 34.0f, ICON_TRIANGLE,
-                                     "Borrar", RGBA8(255, 120, 120, 230));
+                                     LOC("Borrar", "Delete"), RGBA8(255, 120, 120, 230));
                     draw_icon_label(pgf, 680.0f, bb_y + 4.0f, 34.0f, ICON_CIRCLE,
-                                     "Cancelar", RGBA8(200, 215, 245, 220));
+                                     LOC("Cancelar", "Cancel"), RGBA8(200, 215, 245, 220));
                     draw_icon_label(pgf, 820.0f, bb_y + 4.0f, 34.0f, ICON_CROSS,
-                                     "Seleccionar", RGBA8(0, 160, 255, 240));
+                                     LOC("Seleccionar", "Select"), RGBA8(0, 160, 255, 240));
                 } else {
                     int srv_active = webserver_is_active();
                     unsigned int btn_border = srv_active ? RGBA8(0, 230, 118, 200) : RGBA8(0, 160, 255, 160);
@@ -5046,11 +5051,11 @@ int main() {
                                              RGBA8(16, 24, 52, 230), btn_border);
 
                     draw_icon_label(pgf, 480.0f, bb_y + 4.0f, 34.0f, ICON_TRIANGLE,
-                                     "Borrar", RGBA8(255, 120, 120, 230));
+                                     LOC("Borrar", "Delete"), RGBA8(255, 120, 120, 230));
                     draw_icon_label(pgf, 660.0f, bb_y + 4.0f, 34.0f, ICON_CIRCLE,
-                                     "Salir a Cámara", RGBA8(200, 215, 245, 220));
+                                     LOC("Salir a Cámara", "Back to Camera"), RGBA8(200, 215, 245, 220));
                     draw_icon_label(pgf, 830.0f, bb_y + 4.0f, 34.0f, ICON_CROSS,
-                                     "Ver", RGBA8(0, 160, 255, 240));
+                                     LOC("Ver", "View"), RGBA8(0, 160, 255, 240));
                 }
             }
             // ── Fullscreen View (Tema PlayStation Midnight Blue) ───────────────────
@@ -5182,12 +5187,12 @@ int main() {
                     draw_icon_label(pgf, 480.0f, bb_y + 4.0f, 34.0f, ICON_CROSS,
                                     is_video_playing ? "Pausar" : "Reproducir", RGBA8(0, 160, 255, 240));
                     draw_icon_label(pgf, 660.0f, bb_y + 4.0f, 34.0f, ICON_TRIANGLE,
-                                    "Borrar", RGBA8(255, 120, 120, 230));
+                                    LOC("Borrar", "Delete"), RGBA8(255, 120, 120, 230));
                     draw_icon_label(pgf, 810.0f, bb_y + 4.0f, 34.0f, ICON_CIRCLE,
                                     "Salir", RGBA8(200, 215, 245, 220));
                 } else {
                     draw_icon_label(pgf, 640.0f, bb_y + 4.0f, 34.0f, ICON_TRIANGLE,
-                                    "Borrar", RGBA8(255, 120, 120, 230));
+                                    LOC("Borrar", "Delete"), RGBA8(255, 120, 120, 230));
                     draw_icon_label(pgf, 810.0f, bb_y + 4.0f, 34.0f, ICON_CIRCLE,
                                     "Salir", RGBA8(0, 160, 255, 240));
                 }
@@ -5214,16 +5219,16 @@ skip_fullscreen_ui: ;
                 // Title
                 char title_str[64];
                 if (sel_count > 0) {
-                    snprintf(title_str, sizeof(title_str), "¿Eliminar %d fotos seleccionadas?", sel_count);
+                    snprintf(title_str, sizeof(title_str), LOC("¿Eliminar %d fotos seleccionadas?", "Delete %d selected photos?"), sel_count);
                 } else {
-                    snprintf(title_str, sizeof(title_str), "¿Eliminar esta fotografía?");
+                    snprintf(title_str, sizeof(title_str), LOC("¿Eliminar esta fotografía?", "Delete this photo?"));
                 }
                 float tw_title = vita2d_pgf_text_width(pgf, 0.88f, title_str);
                 vita2d_pgf_draw_text(pgf, (int)(mx + (mw - tw_title) * 0.5f), (int)(my + 55),
                                      RGBA8(255, 255, 255, 255), 0.88f, title_str);
 
                 // Subtitle
-                const char *sub_str = "Esta acción no se puede deshacer.";
+                const char *sub_str = LOC("Esta acción no se puede deshacer.", "This action cannot be undone.");
                 float tw_sub = vita2d_pgf_text_width(pgf, 0.70f, sub_str);
                 vita2d_pgf_draw_text(pgf, (int)(mx + (mw - tw_sub) * 0.5f), (int)(my + 88),
                                      RGBA8(180, 190, 210, 220), 0.70f, sub_str);
@@ -5238,14 +5243,14 @@ skip_fullscreen_ui: ;
                 if (delete_dialog_focused == 0) {
                     // Focused: bright red + focus outline
                     draw_centered_pill_button(pgf, btn1_x, btn_y, btn_w, btn_h,
-                                             ICON_CROSS, "Eliminar (Sí)", 0.78f,
+                                             ICON_CROSS, LOC("Eliminar (Sí)", "Delete (Yes)"), 0.78f,
                                              RGBA8(255, 255, 255, 255),
                                              RGBA8(210, 36, 36, 250),
                                              RGBA8(255, 255, 255, 240));
                 } else {
                     // Unfocused: muted
                     draw_centered_pill_button(pgf, btn1_x, btn_y, btn_w, btn_h,
-                                             ICON_NONE, "Eliminar (Sí)", 0.78f,
+                                             ICON_NONE, LOC("Eliminar (Sí)", "Delete (Yes)"), 0.78f,
                                              RGBA8(200, 150, 150, 200),
                                              RGBA8(40, 18, 24, 180),
                                              RGBA8(255, 255, 255, 20));
@@ -5255,14 +5260,14 @@ skip_fullscreen_ui: ;
                 if (delete_dialog_focused == 1) {
                     // Focused: bright slate/blue + focus outline
                     draw_centered_pill_button(pgf, btn2_x, btn_y, btn_w, btn_h,
-                                             ICON_CROSS, "Cancelar (No)", 0.78f,
+                                             ICON_CROSS, LOC("Cancelar (No)", "Cancel (No)"), 0.78f,
                                              RGBA8(255, 255, 255, 255),
                                              RGBA8(40, 56, 86, 250),
                                              RGBA8(255, 255, 255, 240));
                 } else {
                     // Unfocused: muted
                     draw_centered_pill_button(pgf, btn2_x, btn_y, btn_w, btn_h,
-                                             ICON_NONE, "Cancelar (No)", 0.78f,
+                                             ICON_NONE, LOC("Cancelar (No)", "Cancel (No)"), 0.78f,
                                              RGBA8(160, 175, 200, 200),
                                              RGBA8(20, 24, 36, 180),
                                              RGBA8(255, 255, 255, 20));

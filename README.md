@@ -4,124 +4,108 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Download VPK](https://img.shields.io/badge/Download-vitacam.vpk-2ea44f?style=flat&logo=playstation)](https://github.com/darking101/vitacam/releases/latest)
 
+> **Languages / Idiomas:** [English](#english) | [Español](#español)
+
+---
+
+<a name="english"></a>
+## English
+
+**VitaCam Pro** is an advanced camera application, gallery viewer, and high-speed Wi-Fi web hub for the **PlayStation Vita**, developed in native C using [VitaSDK](https://vitasdk.org/).
+
+Auto-detects your console's language: displays in **English** by default on international systems and in **Spanish** on Spanish-configured consoles.
+
+### Key Features
+- **Native Hardware EXIF Metadata:** Automatically injects standard EXIF headers into captured JPEGs (Sony PlayStation Vita, real timestamps, f/2.8 aperture, ISO 100, and sRGB color space).
+- **Realistic Shutter Sound:** Mechanical camera shutter sound and countdown beeps powered by native hardware `SceAudio` at 48,000 Hz stereo at 0 dB.
+- **Self-Timer & Burst Mode:** Configurable countdown timer (Off, 3s, 5s, 10s) with on-screen visual animation and audio beeps, plus continuous burst shooting (3, 5, or 10 consecutive photos).
+- **Multitouch Pinch-to-Zoom:** Smooth 1.0x to 4.0x continuous scaling using two-finger pinch gestures on the front capacitive touchscreen or the left analog stick.
+- **Front Screen Flash / Softbox:** High-intensity full white screen and light ring for selfies in dark environments (flash icon stays visible on rear camera as disabled).
+- **Adaptive [PS] VITA Watermark:** Official vector logo with intelligent background luminance detection (switches dynamically between pure white and high-contrast black).
+- **Wi-Fi Web Hub:** Built-in lightweight HTTP server to view, download, or delete photos remotely from your smartphone or PC with real-time sync to the PS Vita memory gallery.
+- **Persistent User Preferences:** Saves your camera settings (timer, burst, sound, flash, grid) automatically to `ux0:data/VitaCam/config.dat`.
+- **System & RAM Telemetry:** Real-time diagnostics of free and total RAM (`sceKernelGetFreeMemorySize`) and battery percentage in the `[ (i) ]` info modal.
+
+### Controls & Shortcuts
+| Control | Camera Mode | Gallery Mode |
+| :--- | :--- | :--- |
+| **R Trigger / Touch** | Take photo | Next tab |
+| **L Trigger** | - | Previous tab |
+| **Select** | Switch Rear / Front camera | Wi-Fi Web Server & QR |
+| **Triangle** | Toggle Flash mode | Wi-Fi Web Server & QR |
+| **Square** | Toggle Composition Grid | Multi-select mode (batch delete) |
+| **Cross (X)** | Toggle Watermark | Open photo fullscreen |
+| **Left Stick / D-Pad** | Dynamic Zoom (1.0x - 4.0x) | Navigate photos |
+| **Touch Pinch** | Pinch-to-Zoom (1.0x - 4.0x) | Zoom in fullscreen |
+| **Top HUD Icons** | Toggle Timer, Burst, Shutter Sound | - |
+| **Circle** | Switch to Gallery / Cancel timer | Back to Camera / Cancel |
+| **Touch `[ (i) ]`** | - | RAM monitor & About dialog |
+
+### Installation
+1. Download the official installer `vitacam.vpk` from [Releases](https://github.com/darking101/vitacam/releases/latest).
+2. Transfer `vitacam.vpk` to your PS Vita via VitaShell (USB cable or FTP).
+3. In VitaShell, navigate to `vitacam.vpk` and press **Cross (X)** to install.
+
+---
+
+<a name="español"></a>
+## Español
+
 **VitaCam Pro** es una aplicación de cámara avanzada, visor de galería y servidor web Wi-Fi de alta velocidad para la **PlayStation Vita**, desarrollada en C nativo utilizando [VitaSDK](https://vitasdk.org/).
 
-> [!TIP]
-> **¿Quieres probarlo ya en tu PS Vita?** Descarga el archivo instalador oficial desde Releases: [**Descargar vitacam.vpk (Última versión)**](https://github.com/darking101/vitacam/releases/latest) e instálalo con VitaShell.
+Detecta automáticamente el idioma de tu consola: se muestra en **español** si tu consola está configurada en español y en **inglés** para cualquier otro idioma.
 
-Transforma tu PS Vita en una cámara retro moderna con controles manuales, flash de pantalla frontal, marca de agua adaptativa oficial con fecha y hora, y transferencia inalámbrica directa a tu smartphone o PC mediante código QR sin cables.
+### Características Principales
+- **Metadatos EXIF de Hardware Nativos:** Cada captura en formato JPEG incorpora automáticamente cabeceras EXIF completas con fabricante (Sony), modelo (PlayStation Vita), fecha y hora exacta, resolución y valores de toma reales.
+- **Audio Mecánico de Disparo:** Sonido realista de obturador de cámara réflex y beeps de cuenta atrás mediante hardware nativo `SceAudio` a 48,000 Hz estéreo a 0 dB.
+- **Temporizador y Modo Ráfaga:** Conteo regresivo configurable (Desactivado, 3s, 5s, 10s) con animación en pantalla, y ráfaga continua (3, 5 o 10 fotos consecutivas).
+- **Zoom Dinámico y Pellizco Táctil:** Control suave de 1.0x a 4.0x mediante gestos multitáctiles de pellizco (*pinch-to-zoom*) en la pantalla capacitiva o sticks analógicos.
+- **Flash / Softbox Frontal:** Aro de luz y pantalla blanca completa de alta luminosidad para selfies en entornos oscuros.
+- **Sello Inteligente Adaptativo [PS] VITA:** Marca de agua oficial con detección automática de luminosidad (cambia inteligentemente entre blanco puro y negro de alto contraste según el fondo).
+- **Servidor Web Wi-Fi (Web Hub):** Servidor HTTP integrado para descargar o eliminar fotos desde el navegador web del teléfono o PC con sincronización en tiempo real con la galería de la Vita.
+- **Persistencia de Configuración:** Guarda automáticamente todas tus preferencias de usuario en `ux0:data/VitaCam/config.dat`.
+- **Monitor de Sistema en Tiempo Real:** Diagnóstico de consumo de memoria RAM (libre y total) y estado de batería en el botón `[ (i) ]`.
 
----
+### Atajos y Controles
+| Control | Modo Cámara | Modo Galería |
+| :--- | :--- | :--- |
+| **Gatillo R / Tap Pantalla** | Capturar fotografía | Siguiente pestaña |
+| **Gatillo L** | - | Pestaña anterior |
+| **Select** | Conmutar cámara Trasera / Frontal | Menú Servidor Web y QR |
+| **Triángulo** | Alternar modo Flash | Menú Servidor Web y QR |
+| **Cuadrado** | Activar / Desactivar Cuadrícula | Modo selección múltiple (borrado en lote) |
+| **Cruz (X)** | Activar / Desactivar Marca de agua | Abrir foto a pantalla completa |
+| **Stick Izquierdo / D-Pad** | Zoom dinámico (1.0x - 4.0x) | Navegar fotos |
+| **Pellizco táctil** | Pinch-to-zoom (1.0x - 4.0x) | Zoom en pantalla completa |
+| **Botonera Táctil Superior** | Alternar Temporizador, Ráfaga y Sonido | - |
+| **Círculo** | Salir a Galería / Cancelar temporizador | Volver a Cámara / Cancelar |
+| **Touch `[ (i) ]`** | - | Monitor de RAM y créditos |
 
-## Características Principales
-
-### 📸 Cámara Pro y Visor en Tiempo Real
-- **Cámara Trasera y Frontal:** Alterna instantáneamente entre el sensor trasero y delantero.
-- **Modo Flash / Softbox Frontal:** Aro de luz y pantalla blanca completa de alta luminosidad para selfies y entornos oscuros (indicador siempre visible en pantalla).
-- **Inyección de Metadatos EXIF Reales:** Cada captura en formato JPEG incorpora automáticamente cabeceras EXIF completas con fabricante (Sony), modelo (PlayStation Vita), fecha y hora exacta, resolución y valores fotográficos reales.
-- **Audio Mecánico de Disparo:** Feedback acústico realista mediante hardware nativo `SceAudio` para el obturador y las cuentas regresivas.
-- **Temporizador Fotográfico:** Conteo regresivo configurable (Desactivado, 3s, 5s, 10s) con animación en pantalla y beeps audibles sincronizados.
-- **Modo Ráfaga Continua:** Disparo rápido en ráfaga (3, 5 o 10 fotos consecutivas) con numeración progresiva automática.
-- **Sello Inteligente Adaptativo [PS] VITA:**
-  - Marca de agua con el logotipo vectorizado oficial de PlayStation Vita.
-  - Detección automática de luminosidad: el logotipo y la fecha cambian inteligentemente entre blanco puro y negro de alto contraste según el fondo de la toma.
-  - Estampa de fecha y hora exacta de la captura.
-- **Zoom Continuo Dinámico:** Control suave de 1.0x a 4.0x mediante el stick analógico o gestos táctiles de pellizco (*pinch-to-zoom*).
-- **Cuadrícula de Composición:** Guía de regla de tercios para encuadres precisos.
-- **Persistencia de Configuración:** Guarda automáticamente tus preferencias de cámara (temporizador, ráfaga, sonido, flash, cuadrícula) en `ux0:data/VitaCam/config.dat`.
-
-### 🖼️ Galería Continua y Visor Multimedia
-- **Cuadrícula Rápida con Caché:** Navegación ultra fluida con miniaturas cacheadas en memoria.
-- **Filtro por Pestañas de Origen:**
-  - **VitaCam:** Fotografías capturadas con la aplicación (`ux0:/data/vitacam/`).
-  - **Fotos Vita:** Álbum nativo del sistema (`ux0:/picture/`).
-  - **Screenshots:** Capturas de pantalla de tus juegos (`ux0:/picture/SCREENSHOT/`).
-  - **Todo:** Vista unificada de todas las imágenes de la consola.
-- **Visor a Pantalla Completa:** Inspección detallada con zoom dinámico y paneo táctil.
-- **Modo Selección Múltiple:** Selección rápida de fotografías para borrado individual o en lote.
-- **Monitor de Sistema y Recursos:** Información en tiempo real del uso de RAM (libre / total), batería con porcentaje y animación de carga, y reloj del sistema en `[ (i) ]`.
-
-### 🌐 Servidor Web Wi-Fi Integrado (Web Hub)
-- **Transferencia sin Cables:** Servidor HTTP ligero integrado en C nativo para descargar tus fotos directamente al teléfono, tablet o computadora.
-- **Ordenación Cronológica Real:** Visualización instantánea de las fotos ordenadas de la más reciente a la más antigua.
-- **Eliminación Remota Sincronizada:** Borra fotos directamente desde el navegador web móvil o de PC con sincronización en tiempo real con la galería en memoria de la PS Vita.
-- **Acceso Instantáneo por Código QR:** Escanea el código QR que se muestra en pantalla con la cámara de tu teléfono para entrar directamente a la galería web.
-- **Autenticación por PIN y Cookies:** Generación de PIN de seguridad con persistencia de sesión automática vía URL y Cookie.
-- **Interfaz Web Moderna y Responsiva:** Galería web oscura con vista previa en alta resolución y descargas con un solo clic.
+### Instalación
+1. Descarga el paquete instalable oficial `vitacam.vpk` desde la sección de [Releases](https://github.com/darking101/vitacam/releases/latest).
+2. Transfiere el archivo a tu PlayStation Vita mediante VitaShell (usando cable USB o servidor FTP).
+3. En VitaShell, navega hasta `vitacam.vpk` y presiona **Cruz (X)** para completar la instalación.
 
 ---
 
-## Atajos y Controles
+## Compilación desde Código Fuente / Building
 
-### Modo Cámara
-| Botón / Control | Acción |
-| :--- | :--- |
-| **Gatillo R** / **Tap en Pantalla** | Capturar fotografía |
-| **Select** | Cambiar entre cámara Trasera y Frontal |
-| **Triángulo** | Alternar modo Flash (Apagado / Pantalla Blanca / Aro de Luz) |
-| **Cuadrado** | Activar / Desactivar Cuadrícula de composición |
-| **Cruz (X)** | Activar / Desactivar Marca de agua [PS] VITA |
-| **Stick Izquierdo / D-Pad** | Zoom dinámico (Arriba/Abajo) o Pinch-to-zoom táctil |
-| **Botonera Táctil Superior** | Alternar Temporizador, Ráfaga y Sonido de obturador |
-| **Círculo** | Salir a la Galería |
+### Requirements
+- [VitaSDK](https://vitasdk.org/) installed and configured (`$VITASDK`).
+- CMake (version 3.10+) and Make.
 
-### Modo Galería
-| Botón / Control | Acción |
-| :--- | :--- |
-| **D-Pad / Stick** | Navegar entre fotos |
-| **Gatillos L / R** | Cambiar pestaña de origen (VitaCam / Fotos / Capturas / Todo) |
-| **Cruz (X)** | Abrir foto seleccionada a pantalla completa |
-| **Cuadrado** | Iniciar modo de selección múltiple (o marcar/desmarcar foto) |
-| **Triángulo** | Abrir menú del Servidor Web Wi-Fi y Código QR |
-| **Select** | Abrir menú del Servidor Web Wi-Fi |
-| **Touch en `[ (i) ]`** | Monitor de RAM en tiempo real, guía rápida y créditos (@darking101) |
-| **Touch en Pestañas / Fotos** | Selección, navegación y apertura directa |
-
----
-
-## Compilación desde Código Fuente
-
-### Requisitos
-1. [VitaSDK](https://vitasdk.org/) instalado y configurado en tu entorno (`$VITASDK`).
-2. CMake (versión 3.10 o superior) y Make o Ninja.
-
-### Pasos de Compilación
 ```bash
-# Clonar el repositorio
 git clone https://github.com/darking101/vitacam.git
 cd vitacam
-
-# Crear directorio de compilación
 mkdir build && cd build
-
-# Configurar con la toolchain de VitaSDK
 cmake -DCMAKE_TOOLCHAIN_FILE=$VITASDK/share/vita.toolchain.cmake ..
-
-# Compilar el paquete instalable
 make -j4
 ```
 
-El proceso generará:
-- `build/vitacam.vpk`: Paquete instalable oficial para PlayStation Vita listo para transferir e instalar.
+El proceso generará `build/vitacam.vpk` listo para transferir e instalar en tu consola.
 
 ---
 
-## Instalación en PS Vita
-
-1. Descarga el archivo instalador oficial `vitacam.vpk` desde la sección de [Releases](https://github.com/darking101/vitacam/releases/latest).
-2. Transfiere el archivo `vitacam.vpk` a tu PlayStation Vita mediante VitaShell (a través de conexión USB o vía FTP).
-3. En VitaShell, navega hasta la ubicación donde copiaste el archivo `vitacam.vpk` y presiona **Cruz (X)** para completar la instalación.
-
----
-
-## Licencia
-
-Este proyecto está bajo la Licencia MIT. Consulta el archivo [LICENSE](LICENSE) para más detalles.
-
----
-
-## Créditos
-
-Desarrollado y creado por **[darking101](https://github.com/darking101)**.
-
-Agradecimientos a la comunidad de homebrew de PS Vita y a los creadores de [VitaSDK](https://vitasdk.org/) y [vita2d](https://github.com/xerpi/libvita2d).
+## Licencia y Créditos / Credits
+Desarrollado y creado por **[darking101](https://github.com/darking101)**. Licencia MIT.
+Agradecimientos a la comunidad de homebrew de PlayStation Vita, VitaSDK y libvita2d.
