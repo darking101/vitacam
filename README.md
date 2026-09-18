@@ -17,13 +17,18 @@ Transforma tu PS Vita en una cámara retro moderna con controles manuales, flash
 
 ### 📸 Cámara Pro y Visor en Tiempo Real
 - **Cámara Trasera y Frontal:** Alterna instantáneamente entre el sensor trasero y delantero.
-- **Modo Flash / Softbox Frontal:** Aro de luz y pantalla blanca completa de alta luminosidad para selfies y entornos oscuros.
+- **Modo Flash / Softbox Frontal:** Aro de luz y pantalla blanca completa de alta luminosidad para selfies y entornos oscuros (indicador siempre visible en pantalla).
+- **Inyección de Metadatos EXIF Reales:** Cada captura en formato JPEG incorpora automáticamente cabeceras EXIF completas con fabricante (Sony), modelo (PlayStation Vita), fecha y hora exacta, resolución y valores fotográficos reales.
+- **Audio Mecánico de Disparo:** Feedback acústico realista mediante hardware nativo `SceAudio` para el obturador y las cuentas regresivas.
+- **Temporizador Fotográfico:** Conteo regresivo configurable (Desactivado, 3s, 5s, 10s) con animación en pantalla y beeps audibles sincronizados.
+- **Modo Ráfaga Continua:** Disparo rápido en ráfaga (3, 5 o 10 fotos consecutivas) con numeración progresiva automática.
 - **Sello Inteligente Adaptativo [PS] VITA:**
   - Marca de agua con el logotipo vectorizado oficial de PlayStation Vita.
   - Detección automática de luminosidad: el logotipo y la fecha cambian inteligentemente entre blanco puro y negro de alto contraste según el fondo de la toma.
   - Estampa de fecha y hora exacta de la captura.
-- **Zoom Continuo Dinámico:** Control suave de 1.0x a 5.0x mediante el stick analógico o gestos táctiles de pellizco (*pinch-to-zoom*).
+- **Zoom Continuo Dinámico:** Control suave de 1.0x a 4.0x mediante el stick analógico o gestos táctiles de pellizco (*pinch-to-zoom*).
 - **Cuadrícula de Composición:** Guía de regla de tercios para encuadres precisos.
+- **Persistencia de Configuración:** Guarda automáticamente tus preferencias de cámara (temporizador, ráfaga, sonido, flash, cuadrícula) en `ux0:data/VitaCam/config.dat`.
 
 ### 🖼️ Galería Continua y Visor Multimedia
 - **Cuadrícula Rápida con Caché:** Navegación ultra fluida con miniaturas cacheadas en memoria.
@@ -34,10 +39,12 @@ Transforma tu PS Vita en una cámara retro moderna con controles manuales, flash
   - **Todo:** Vista unificada de todas las imágenes de la consola.
 - **Visor a Pantalla Completa:** Inspección detallada con zoom dinámico y paneo táctil.
 - **Modo Selección Múltiple:** Selección rápida de fotografías para borrado individual o en lote.
-- **Barra de Estado Completa:** Reloj en tiempo real, indicador gráfico de batería con porcentaje y animación de carga, y botón de información `[ (i) ]`.
+- **Monitor de Sistema y Recursos:** Información en tiempo real del uso de RAM (libre / total), batería con porcentaje y animación de carga, y reloj del sistema en `[ (i) ]`.
 
 ### 🌐 Servidor Web Wi-Fi Integrado (Web Hub)
 - **Transferencia sin Cables:** Servidor HTTP ligero integrado en C nativo para descargar tus fotos directamente al teléfono, tablet o computadora.
+- **Ordenación Cronológica Real:** Visualización instantánea de las fotos ordenadas de la más reciente a la más antigua.
+- **Eliminación Remota Sincronizada:** Borra fotos directamente desde el navegador web móvil o de PC con sincronización en tiempo real con la galería en memoria de la PS Vita.
 - **Acceso Instantáneo por Código QR:** Escanea el código QR que se muestra en pantalla con la cámara de tu teléfono para entrar directamente a la galería web.
 - **Autenticación por PIN y Cookies:** Generación de PIN de seguridad con persistencia de sesión automática vía URL y Cookie.
 - **Interfaz Web Moderna y Responsiva:** Galería web oscura con vista previa en alta resolución y descargas con un solo clic.
@@ -54,7 +61,8 @@ Transforma tu PS Vita en una cámara retro moderna con controles manuales, flash
 | **Triángulo** | Alternar modo Flash (Apagado / Pantalla Blanca / Aro de Luz) |
 | **Cuadrado** | Activar / Desactivar Cuadrícula de composición |
 | **Cruz (X)** | Activar / Desactivar Marca de agua [PS] VITA |
-| **Stick Izquierdo / D-Pad** | Zoom dinámico (Arriba/Abajo) |
+| **Stick Izquierdo / D-Pad** | Zoom dinámico (Arriba/Abajo) o Pinch-to-zoom táctil |
+| **Botonera Táctil Superior** | Alternar Temporizador, Ráfaga y Sonido de obturador |
 | **Círculo** | Salir a la Galería |
 
 ### Modo Galería
@@ -66,7 +74,7 @@ Transforma tu PS Vita en una cámara retro moderna con controles manuales, flash
 | **Cuadrado** | Iniciar modo de selección múltiple (o marcar/desmarcar foto) |
 | **Triángulo** | Abrir menú del Servidor Web Wi-Fi y Código QR |
 | **Select** | Abrir menú del Servidor Web Wi-Fi |
-| **Touch en `[ (i) ]`** | Abrir créditos de autor (@darking101) y guía rápida |
+| **Touch en `[ (i) ]`** | Monitor de RAM en tiempo real, guía rápida y créditos (@darking101) |
 | **Touch en Pestañas / Fotos** | Selección, navegación y apertura directa |
 
 ---
@@ -89,28 +97,20 @@ mkdir build && cd build
 # Configurar con la toolchain de VitaSDK
 cmake -DCMAKE_TOOLCHAIN_FILE=$VITASDK/share/vita.toolchain.cmake ..
 
-# Compilar el binario y generar el VPK
+# Compilar el paquete instalable
 make -j4
 ```
 
 El proceso generará:
-- `build/vitacam.vpk`: Paquete instalable para PlayStation Vita.
-- `build/eboot.bin`: Binario ejecutable para actualización rápida vía FTP.
+- `build/vitacam.vpk`: Paquete instalable oficial para PlayStation Vita listo para transferir e instalar.
 
 ---
 
 ## Instalación en PS Vita
 
-1. **Método VPK (Recomendado):**
-   - Transfiere `vitacam.vpk` a tu consola usando VitaShell (FTP o USB).
-   - En VitaShell, navega hasta el archivo y presiona **Cruz (X)** para instalarlo.
-
-2. **Método Rápido por FTP (Desarrollo):**
-   - Abre VitaShell en tu PS Vita y presiona **Select** para iniciar el servidor FTP.
-   - Ejecuta desde tu PC:
-     ```bash
-     VITA_IP="TU_IP_VITA" python3 send_ftp.py
-     ```
+1. Descarga el archivo instalador oficial `vitacam.vpk` desde la sección de [Releases](https://github.com/darking101/vitacam/releases/latest).
+2. Transfiere el archivo `vitacam.vpk` a tu PlayStation Vita mediante VitaShell (a través de conexión USB o vía FTP).
+3. En VitaShell, navega hasta la ubicación donde copiaste el archivo `vitacam.vpk` y presiona **Cruz (X)** para completar la instalación.
 
 ---
 
