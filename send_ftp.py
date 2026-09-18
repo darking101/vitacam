@@ -3,7 +3,7 @@ import sys
 import ftplib
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VITA_IP = os.environ.get("VITA_IP", "192.168.1.67")
+VITA_IP = os.environ.get("VITA_IP", "192.168.1.68")
 VITA_PORT = int(os.environ.get("VITA_PORT", "1337"))
 LOCAL_VPK = os.path.join(SCRIPT_DIR, "build", "vitacam.vpk")
 REMOTE_PATH = "ux0:/vitacam.vpk"

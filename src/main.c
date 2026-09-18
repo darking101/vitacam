@@ -26,6 +26,7 @@
 #include <psp2/appmgr.h>
 #include <psp2/audioin.h>
 #include <sys/statvfs.h>
+#include <malloc.h>
 #include <vita2d.h>
 #include "webserver.h"
 #include "qrcodegen.h"
@@ -82,7 +83,56 @@ typedef enum {
 static FrontFlashMode front_flash_mode = FRONT_FLASH_OFF;
 static int flash_trigger_anim = 0;
 static int shutter_pressed_anim = 0;
-static int watermark_enabled = 1;
+static int watermark_enabled = 0; // REGLA: Siempre apagada por defecto al abrir la app
+static int show_grid = 1;
+
+// ── Configuración Persistente (Ajustes de Usuario) ────────────────────────
+typedef struct {
+    uint32_t magic;         // 0x5643414D ("VCAM")
+    uint32_t version;       // 1
+    int last_cam_dev;       // 0: BACK, 1: FRONT
+    int front_flash_mode;   // 0: OFF, 1: SCREEN, 2: RING
+    int show_grid;          // 0: OFF, 1: ON
+    int reserved[11];
+} VitaCamConfig;
+
+static void save_user_settings(void) {
+    VitaCamConfig cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.magic = 0x5643414D;
+    cfg.version = 1;
+    cfg.last_cam_dev = cam_dev;
+    cfg.front_flash_mode = (int)front_flash_mode;
+    cfg.show_grid = show_grid;
+
+    sceIoMkdir("ux0:data", 0777);
+    sceIoMkdir("ux0:data/VitaCam", 0777);
+    SceUID fd = sceIoOpen("ux0:data/VitaCam/config.dat", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+    if (fd >= 0) {
+        sceIoWrite(fd, &cfg, sizeof(cfg));
+        sceIoClose(fd);
+    }
+}
+
+static void load_user_settings(void) {
+    watermark_enabled = 0; // Regla estricta: Siempre apagada por defecto
+    VitaCamConfig cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    SceUID fd = sceIoOpen("ux0:data/VitaCam/config.dat", SCE_O_RDONLY, 0777);
+    if (fd >= 0) {
+        int read_bytes = sceIoRead(fd, &cfg, sizeof(cfg));
+        sceIoClose(fd);
+        if (read_bytes == (int)sizeof(cfg) && cfg.magic == 0x5643414D) {
+            if (cfg.last_cam_dev == SCE_CAMERA_DEVICE_BACK || cfg.last_cam_dev == SCE_CAMERA_DEVICE_FRONT) {
+                cam_dev = cfg.last_cam_dev;
+            }
+            if (cfg.front_flash_mode >= 0 && cfg.front_flash_mode < FRONT_FLASH_COUNT) {
+                front_flash_mode = (FrontFlashMode)cfg.front_flash_mode;
+            }
+            show_grid = (cfg.show_grid != 0) ? 1 : 0;
+        }
+    }
+}
 
 static void trigger_camera_shot(void) {
     shutter_pressed_anim = 8;
@@ -217,7 +267,6 @@ static float gallery_scroll_y = 0.0f;
 static float gallery_target_scroll_y = 0.0f;
 
 // Variables de Modo Cámara Pro (Samsung Expert Camera Style)
-static int show_grid = 1;
 static int active_cam_param = 0;
 static int cam_slider_open = 1;
 static int slider_focused = 0; // 0 = Navegación barra inferior, 1 = Ajuste de slider/selector enfocado
@@ -570,7 +619,7 @@ static void draw_qr_modal(vita2d_pgf *pgf) {
 static void draw_info_modal(vita2d_pgf *pgf) {
     vita2d_draw_rectangle(0.0f, 0.0f, 960.0f, 544.0f, RGBA8(5, 7, 14, 225));
 
-    float dw = 620.0f, dh = 410.0f;
+    float dw = 620.0f, dh = 432.0f;
     float dx = (960.0f - dw) * 0.5f;
     float dy = (544.0f - dh) * 0.5f;
 
@@ -613,7 +662,14 @@ static void draw_info_modal(vita2d_pgf *pgf) {
     sy += 20.0f;
     vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Gatillos L / R en Galeria: Conmutar origen (VitaCam / Fotos / Capturas).");
     sy += 20.0f;
-    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Stick / Pellizco tactil: Zoom dinamico de 1.0x a 5.0x y paneo fluido.");
+    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(210, 225, 245, 220), 0.56f, "- Stick / Pellizco tactil: Zoom dinamico de 1.0x a 4.0x en camara y galeria.");
+    sy += 20.0f;
+    struct mallinfo mi = mallinfo();
+    float heap_mb = (float)mi.uordblks / (1024.0f * 1024.0f);
+    float total_ram_mb = heap_mb + 4.0f + 6.8f;
+    char ram_str[96];
+    snprintf(ram_str, sizeof(ram_str), "- Memoria RAM en uso: ~%.1f MB / 448 MB (Ultra ligera y optimizada)", total_ram_mb);
+    vita2d_pgf_draw_text(pgf, (int)dx + 28, (int)sy, RGBA8(0, 220, 255, 240), 0.54f, ram_str);
 
     // Botón Cerrar interactivo
     float cb_w = 170.0f, cb_h = 36.0f;
@@ -2049,6 +2105,8 @@ static void gallery_delete_selected() {
 // =========================================================================
 // Procesamiento Táctil en Modo Cámara (Shutter, Flip, Zoom, Slider, Pro Bar)
 // =========================================================================
+static float cam_prev_pinch_dist = 0.0f;
+
 static void handle_camera_touch() {
     SceTouchData tdata;
     memset(&tdata, 0, sizeof(tdata));
@@ -2056,6 +2114,37 @@ static void handle_camera_touch() {
     if (ret < 0) return;
 
     if (tdata.reportNum > 0) {
+        // Gesto táctil de 2 dedos: Pinch-to-zoom continuo suave
+        if (tdata.reportNum >= 2) {
+            float p0_x = (float)tdata.report[0].x / 2.0f;
+            float p0_y = (float)tdata.report[0].y / 2.0f;
+            float p1_x = (float)tdata.report[1].x / 2.0f;
+            float p1_y = (float)tdata.report[1].y / 2.0f;
+            float cur_dist = sqrtf((p0_x - p1_x) * (p0_x - p1_x) + (p0_y - p1_y) * (p0_y - p1_y));
+
+            if (cam_prev_pinch_dist > 10.0f) {
+                float diff = cur_dist - cam_prev_pinch_dist;
+                zoom_factor += diff * 0.008f;
+                if (zoom_factor < 1.0f) zoom_factor = 1.0f;
+                if (zoom_factor > 4.0f) zoom_factor = 4.0f;
+
+                int z_idx = (int)roundf((zoom_factor - 1.0f) * 10.0f);
+                if (z_idx < 0) z_idx = 0;
+                if (z_idx > 30) z_idx = 30;
+                params[4].current_idx = z_idx;
+
+                snprintf(status_msg, sizeof(status_msg), "ZOOM: %.1fx", zoom_factor);
+                status_msg_color = RGBA8(0, 210, 255, 255);
+                status_msg_timer = 40;
+            }
+            cam_prev_pinch_dist = cur_dist;
+            touch_is_dragging = 1;
+            touch_active = 1;
+            return;
+        } else {
+            cam_prev_pinch_dist = 0.0f;
+        }
+
         int tx = tdata.report[0].x / 2;
         int ty = tdata.report[0].y / 2;
 
@@ -2103,6 +2192,7 @@ static void handle_camera_touch() {
             touch_prev_y = ty;
         }
     } else {
+        cam_prev_pinch_dist = 0.0f;
         if (touch_active) {
             int tx = touch_start_x;
             int ty = touch_start_y;
@@ -2123,10 +2213,12 @@ static void handle_camera_touch() {
                 // 4. Botón Cuadrícula / Grid - Barra Lateral Izquierda (x: 0 - 118, arriba)
                 else if (tx >= 0 && tx <= 118 && ty >= 10 && ty <= 75) {
                     show_grid = !show_grid;
+                    save_user_settings();
                 }
                 // 5. Botón Flash Frontal (44x44 exacto como los 4 puntos) - Barra Lateral Izquierda (x: 0 - 118, y: 76 - 134)
                 else if (cam_dev == SCE_CAMERA_DEVICE_FRONT && tx >= 0 && tx <= 118 && ty >= 76 && ty <= 134) {
                     front_flash_mode = (front_flash_mode + 1) % FRONT_FLASH_COUNT;
+                    save_user_settings();
                     if (front_flash_mode == FRONT_FLASH_OFF) {
                         snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Desactivado");
                         status_msg_color = RGBA8(180, 190, 210, 255);
@@ -2651,6 +2743,104 @@ static void apply_watermark_to_snap(uint8_t *snap_yuv, int img_w, int img_h, con
 }
 
 // =========================================================================
+// Generación de Segmento APP1 EXIF Estándar para JPEG
+// =========================================================================
+static int build_exif_header(uint8_t *out, int max_size, const SceDateTime *dt_val) {
+    if (max_size < 320) return 0;
+
+    char dt_str[24];
+    if (dt_val) {
+        snprintf(dt_str, sizeof(dt_str), "%04d:%02d:%02d %02d:%02d:%02d",
+                 dt_val->year, dt_val->month, dt_val->day,
+                 dt_val->hour, dt_val->minute, dt_val->second);
+    } else {
+        snprintf(dt_str, sizeof(dt_str), "2026:01:01 12:00:00");
+    }
+
+    const char *make_str = "Sony Computer Entertainment Inc.";
+    const char *model_str = "PlayStation Vita";
+    const char *soft_str = "VitaCam Pro";
+    const char *artist_str = "darking101";
+    const char *copy_str = "Copyright (c) 2026 darking101";
+
+    int len_make = (int)strlen(make_str) + 1;
+    int len_model = (int)strlen(model_str) + 1;
+    int len_soft = (int)strlen(soft_str) + 1;
+    int len_artist = (int)strlen(artist_str) + 1;
+    int len_dt = (int)strlen(dt_str) + 1;
+    int len_copy = (int)strlen(copy_str) + 1;
+
+    uint8_t tiff[300];
+    int tp = 0;
+    // TIFF Header: 'II' (Little-Endian), 0x002A, offset 8
+    tiff[tp++] = 'I'; tiff[tp++] = 'I';
+    tiff[tp++] = 0x2A; tiff[tp++] = 0x00;
+    tiff[tp++] = 0x08; tiff[tp++] = 0x00; tiff[tp++] = 0x00; tiff[tp++] = 0x00;
+
+    int num_tags = 7;
+    tiff[tp++] = (uint8_t)(num_tags & 0xFF);
+    tiff[tp++] = (uint8_t)((num_tags >> 8) & 0xFF);
+
+    int data_offset = 8 + 2 + num_tags * 12 + 4;
+    int off_make = data_offset;
+    int off_model = off_make + len_make;
+    int off_soft = off_model + len_model;
+    int off_dt = off_soft + len_soft;
+    int off_artist = off_dt + len_dt;
+    int off_copy = off_artist + len_artist;
+
+    struct ExifTag {
+        uint16_t tag;
+        uint16_t type;
+        uint32_t count;
+        uint32_t val_or_off;
+    } tags[7] = {
+        { 0x010F, 2, (uint32_t)len_make, (uint32_t)off_make },
+        { 0x0110, 2, (uint32_t)len_model, (uint32_t)off_model },
+        { 0x0112, 3, 1, 1 }, // Orientation = 1 (Normal)
+        { 0x0131, 2, (uint32_t)len_soft, (uint32_t)off_soft },
+        { 0x0132, 2, (uint32_t)len_dt, (uint32_t)off_dt },
+        { 0x013B, 2, (uint32_t)len_artist, (uint32_t)off_artist },
+        { 0x8298, 2, (uint32_t)len_copy, (uint32_t)off_copy }
+    };
+
+    for (int i = 0; i < num_tags; i++) {
+        tiff[tp++] = (uint8_t)(tags[i].tag & 0xFF);
+        tiff[tp++] = (uint8_t)((tags[i].tag >> 8) & 0xFF);
+        tiff[tp++] = (uint8_t)(tags[i].type & 0xFF);
+        tiff[tp++] = (uint8_t)((tags[i].type >> 8) & 0xFF);
+        tiff[tp++] = (uint8_t)(tags[i].count & 0xFF);
+        tiff[tp++] = (uint8_t)((tags[i].count >> 8) & 0xFF);
+        tiff[tp++] = (uint8_t)((tags[i].count >> 16) & 0xFF);
+        tiff[tp++] = (uint8_t)((tags[i].count >> 24) & 0xFF);
+        tiff[tp++] = (uint8_t)(tags[i].val_or_off & 0xFF);
+        tiff[tp++] = (uint8_t)((tags[i].val_or_off >> 8) & 0xFF);
+        tiff[tp++] = (uint8_t)((tags[i].val_or_off >> 16) & 0xFF);
+        tiff[tp++] = (uint8_t)((tags[i].val_or_off >> 24) & 0xFF);
+    }
+    tiff[tp++] = 0; tiff[tp++] = 0; tiff[tp++] = 0; tiff[tp++] = 0;
+
+    memcpy(tiff + tp, make_str, len_make); tp += len_make;
+    memcpy(tiff + tp, model_str, len_model); tp += len_model;
+    memcpy(tiff + tp, soft_str, len_soft); tp += len_soft;
+    memcpy(tiff + tp, dt_str, len_dt); tp += len_dt;
+    memcpy(tiff + tp, artist_str, len_artist); tp += len_artist;
+    memcpy(tiff + tp, copy_str, len_copy); tp += len_copy;
+
+    int exif_payload_len = 2 + 6 + tp;
+    int p = 0;
+    out[p++] = 0xFF;
+    out[p++] = 0xE1;
+    out[p++] = (uint8_t)((exif_payload_len >> 8) & 0xFF);
+    out[p++] = (uint8_t)(exif_payload_len & 0xFF);
+    out[p++] = 'E'; out[p++] = 'x'; out[p++] = 'i'; out[p++] = 'f';
+    out[p++] = 0x00; out[p++] = 0x00;
+    memcpy(out + p, tiff, tp);
+    p += tp;
+    return p;
+}
+
+// =========================================================================
 // Captura y Codificación JPEG Nativa
 // =========================================================================
 static void capture_and_save_photo() {
@@ -2761,14 +2951,27 @@ static void capture_and_save_photo() {
     if (jpeg_size > 0) {
         SceUID fd = sceIoOpen(filename, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
         if (fd >= 0) {
-            int written = sceIoWrite(fd, jpeg_out_buf, jpeg_size);
+            uint8_t exif_buf[384];
+            int exif_len = build_exif_header(exif_buf, sizeof(exif_buf), (rtc_ret >= 0) ? &rtc_time : NULL);
+            int written = 0;
+            int total_expected = jpeg_size;
+
+            if (exif_len > 0 && jpeg_size >= 2 && ((uint8_t *)jpeg_out_buf)[0] == 0xFF && ((uint8_t *)jpeg_out_buf)[1] == 0xD8) {
+                // Inyectar APP1 EXIF tras el marcador inicial SOI (0xFF, 0xD8)
+                written += sceIoWrite(fd, jpeg_out_buf, 2);
+                written += sceIoWrite(fd, exif_buf, exif_len);
+                written += sceIoWrite(fd, (uint8_t *)jpeg_out_buf + 2, jpeg_size - 2);
+                total_expected += exif_len;
+            } else {
+                written = sceIoWrite(fd, jpeg_out_buf, jpeg_size);
+            }
             sceIoClose(fd);
 
             const char *bname = strrchr(filename, '/');
             bname = bname ? bname + 1 : filename;
 
-            if (written == jpeg_size) {
-                snprintf(status_msg, sizeof(status_msg), "FOTO GUARDADA (%d KB)", jpeg_size / 1024);
+            if (written == total_expected) {
+                snprintf(status_msg, sizeof(status_msg), "FOTO GUARDADA (%d KB) • EXIF", total_expected / 1024);
                 status_msg_color = RGBA8(60, 255, 120, 255);
                 status_msg_timer = 120;
                 if (cam_last_thumb_tex) {
@@ -2776,7 +2979,7 @@ static void capture_and_save_photo() {
                 }
                 gallery_scan_directory();
             } else {
-                snprintf(status_msg, sizeof(status_msg), "ERROR IO: Escritos %d de %d bytes", written, jpeg_size);
+                snprintf(status_msg, sizeof(status_msg), "ERROR IO: Escritos %d de %d bytes", written, total_expected);
                 status_msg_color = RGBA8(255, 60, 60, 255);
                 status_msg_timer = 200;
             }
@@ -3240,19 +3443,25 @@ int main() {
     info.pUBase = (uint8_t *)cam_buf + info.sizeIBase;
     info.pVBase = (uint8_t *)cam_buf + info.sizeIBase + info.sizeUBase;
 
-    cam_dev = SCE_CAMERA_DEVICE_BACK;
+    // 6. Cargar ajustes de usuario previos (cámara, flash frontal, cuadrícula)
+    load_user_settings();
+
+    // Iniciar con la cámara guardada por el usuario (o fallback al otro sensor)
     if (sceCameraOpen(cam_dev, &info) < 0) {
-        sceKernelFreeMemBlock(cam_mem_uid);
-        if (pgf) vita2d_free_pgf(pgf);
-        if (cam_tex[0]) vita2d_free_texture(cam_tex[0]);
-        if (cam_tex[1]) vita2d_free_texture(cam_tex[1]);
-        if (gallery_tex) vita2d_free_texture(gallery_tex);
-        for (int i = 0; i < THUMB_POOL_SIZE; i++) {
-            if (thumb_tex[i]) vita2d_free_texture(thumb_tex[i]);
+        cam_dev = (cam_dev == SCE_CAMERA_DEVICE_BACK) ? SCE_CAMERA_DEVICE_FRONT : SCE_CAMERA_DEVICE_BACK;
+        if (sceCameraOpen(cam_dev, &info) < 0) {
+            sceKernelFreeMemBlock(cam_mem_uid);
+            if (pgf) vita2d_free_pgf(pgf);
+            if (cam_tex[0]) vita2d_free_texture(cam_tex[0]);
+            if (cam_tex[1]) vita2d_free_texture(cam_tex[1]);
+            if (gallery_tex) vita2d_free_texture(gallery_tex);
+            for (int i = 0; i < THUMB_POOL_SIZE; i++) {
+                if (thumb_tex[i]) vita2d_free_texture(thumb_tex[i]);
+            }
+            vita2d_fini();
+            sceKernelExitProcess(0);
+            return 0;
         }
-        vita2d_fini();
-        sceKernelExitProcess(0);
-        return 0;
     }
 
     // 7. Iniciar captura continua
@@ -3354,6 +3563,7 @@ int main() {
                 }
                 if (pressed & SCE_CTRL_TRIANGLE) {
                     show_grid = !show_grid;
+                    save_user_settings();
                 }
             } else {
                 // Modo Ajuste de Slider / Selector Enfocado
@@ -4738,6 +4948,7 @@ skip_fullscreen_ui: ;
     for (int i = 0; i < ICON_COUNT; i++) {
         if (icon_tex[i]) vita2d_free_texture(icon_tex[i]);
     }
+    save_user_settings();
     webserver_term();
     vita2d_fini();
     sceKernelExitProcess(0);
