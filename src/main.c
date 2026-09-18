@@ -117,55 +117,77 @@ static int burst_mode = 0;          // 0: OFF, 3: 3x, 5: 5x
 static int burst_remaining = 0;
 
 static int sound_worker_thread(SceSize args, void *argp) {
-    int port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN, 512, 44100, SCE_AUDIO_OUT_MODE_MONO);
-    if (port < 0) return 0;
+    int port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_BGM, 512, 48000, SCE_AUDIO_OUT_MODE_STEREO);
+    if (port < 0) {
+        port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN, 512, 48000, SCE_AUDIO_OUT_MODE_STEREO);
+    }
+    if (port >= 0) {
+        int vols[2] = { SCE_AUDIO_VOLUME_0DB, SCE_AUDIO_VOLUME_0DB };
+        sceAudioOutSetVolume(port, SCE_AUDIO_VOLUME_FLAG_L_CH | SCE_AUDIO_VOLUME_FLAG_R_CH, vols);
+    }
 
     while (sound_running) {
+        if (port < 0) {
+            port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_BGM, 512, 48000, SCE_AUDIO_OUT_MODE_STEREO);
+            if (port < 0) {
+                port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN, 512, 48000, SCE_AUDIO_OUT_MODE_STEREO);
+            }
+            if (port >= 0) {
+                int vols[2] = { SCE_AUDIO_VOLUME_0DB, SCE_AUDIO_VOLUME_0DB };
+                sceAudioOutSetVolume(port, SCE_AUDIO_VOLUME_FLAG_L_CH | SCE_AUDIO_VOLUME_FLAG_R_CH, vols);
+            } else {
+                sceKernelDelayThread(100000);
+                continue;
+            }
+        }
+
         if (sound_req_shutter && sound_enabled) {
             sound_req_shutter = 0;
-            const int total = 44100 * 110 / 1000;
-            int16_t block[512];
+            const int total = 48000 * 120 / 1000;
+            int16_t block[512 * 2];
             for (int offset = 0; offset < total; offset += 512) {
                 for (int i = 0; i < 512; i++) {
                     int s_idx = offset + i;
+                    int16_t val = 0;
                     if (s_idx < total) {
-                        float t = (float)s_idx / 44100.0f;
+                        float t = (float)s_idx / 48000.0f;
                         float s = 0.0f;
-                        if (s_idx < 1600) {
-                            float env = expf(-t * 130.0f);
-                            s = sinf(6.28318f * 1200.0f * t) * 0.7f + sinf(6.28318f * 400.0f * t) * 0.3f;
-                            block[i] = (int16_t)(s * env * 28000.0f);
-                        } else if (s_idx < 2200) {
-                            block[i] = 0;
+                        if (s_idx < 1800) {
+                            float env = expf(-t * 140.0f);
+                            s = sinf(6.28318f * 1200.0f * t) * 0.7f + sinf(6.28318f * 450.0f * t) * 0.3f;
+                            val = (int16_t)(s * env * 30000.0f);
+                        } else if (s_idx < 2500) {
+                            val = 0;
                         } else {
-                            float t2 = (float)(s_idx - 2200) / 44100.0f;
-                            float env = expf(-t2 * 100.0f);
-                            s = sinf(6.28318f * 700.0f * t2) * 0.6f + sinf(6.28318f * 300.0f * t2) * 0.4f;
-                            block[i] = (int16_t)(s * env * 24000.0f);
+                            float t2 = (float)(s_idx - 2500) / 48000.0f;
+                            float env = expf(-t2 * 110.0f);
+                            s = sinf(6.28318f * 750.0f * t2) * 0.6f + sinf(6.28318f * 320.0f * t2) * 0.4f;
+                            val = (int16_t)(s * env * 26000.0f);
                         }
-                    } else {
-                        block[i] = 0;
                     }
+                    block[i * 2] = val;
+                    block[i * 2 + 1] = val;
                 }
                 sceAudioOutOutput(port, block);
             }
         } else if (sound_req_beep && sound_enabled) {
             int is_final = (sound_req_beep == 2);
             sound_req_beep = 0;
-            int dur_ms = is_final ? 120 : 60;
-            float freq = is_final ? 2000.0f : 1000.0f;
-            int total = 44100 * dur_ms / 1000;
-            int16_t block[512];
+            int dur_ms = is_final ? 140 : 70;
+            float freq = is_final ? 2200.0f : 1100.0f;
+            int total = 48000 * dur_ms / 1000;
+            int16_t block[512 * 2];
             for (int offset = 0; offset < total; offset += 512) {
                 for (int i = 0; i < 512; i++) {
                     int s_idx = offset + i;
+                    int16_t val = 0;
                     if (s_idx < total) {
-                        float t = (float)s_idx / 44100.0f;
+                        float t = (float)s_idx / 48000.0f;
                         float s = sinf(6.28318f * freq * t);
-                        block[i] = (int16_t)(s * 22000.0f);
-                    } else {
-                        block[i] = 0;
+                        val = (int16_t)(s * 26000.0f);
                     }
+                    block[i * 2] = val;
+                    block[i * 2 + 1] = val;
                 }
                 sceAudioOutOutput(port, block);
             }
@@ -175,7 +197,9 @@ static int sound_worker_thread(SceSize args, void *argp) {
             sceKernelDelayThread(10000);
         }
     }
-    sceAudioOutReleasePort(port);
+    if (port >= 0) {
+        sceAudioOutReleasePort(port);
+    }
     return 0;
 }
 
@@ -2375,21 +2399,27 @@ static void handle_camera_touch() {
                     show_grid = !show_grid;
                     save_user_settings();
                 }
-                // 5. Botón Flash Frontal (44x44 exacto como los 4 puntos) - Barra Lateral Izquierda (x: 0 - 118, y: 76 - 134)
-                else if (cam_dev == SCE_CAMERA_DEVICE_FRONT && tx >= 0 && tx <= 118 && ty >= 76 && ty <= 134) {
-                    front_flash_mode = (front_flash_mode + 1) % FRONT_FLASH_COUNT;
-                    save_user_settings();
-                    if (front_flash_mode == FRONT_FLASH_OFF) {
-                        snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Desactivado");
-                        status_msg_color = RGBA8(180, 190, 210, 255);
-                    } else if (front_flash_mode == FRONT_FLASH_SCREEN) {
-                        snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Pantalla Completa (Disparo Blanco)");
-                        status_msg_color = RGBA8(255, 215, 60, 255);
+                // 5. Botón Flash (Siempre presente) - Barra Lateral Izquierda (x: 0 - 118, y: 76 - 134)
+                else if (tx >= 0 && tx <= 118 && ty >= 76 && ty <= 134) {
+                    if (cam_dev == SCE_CAMERA_DEVICE_BACK) {
+                        snprintf(status_msg, sizeof(status_msg), "Flash no disponible en camara trasera (sin LED)");
+                        status_msg_color = RGBA8(255, 140, 60, 255);
+                        status_msg_timer = 90;
                     } else {
-                        snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Anillo de Luz (Marco Iluminado)");
-                        status_msg_color = RGBA8(255, 255, 255, 255);
+                        front_flash_mode = (front_flash_mode + 1) % FRONT_FLASH_COUNT;
+                        save_user_settings();
+                        if (front_flash_mode == FRONT_FLASH_OFF) {
+                            snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Desactivado");
+                            status_msg_color = RGBA8(180, 190, 210, 255);
+                        } else if (front_flash_mode == FRONT_FLASH_SCREEN) {
+                            snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Pantalla Completa (Disparo Blanco)");
+                            status_msg_color = RGBA8(255, 215, 60, 255);
+                        } else {
+                            snprintf(status_msg, sizeof(status_msg), "Flash Frontal: Anillo de Luz (Marco Iluminado)");
+                            status_msg_color = RGBA8(255, 255, 255, 255);
+                        }
+                        status_msg_timer = 90;
                     }
-                    status_msg_timer = 90;
                 }
                 // 5b. Botón Marca de Agua (Watermark) - Barra Lateral Izquierda (x: 0 - 118, y: 135 - 193)
                 else if (tx >= 0 && tx <= 118 && ty >= 135 && ty <= 193) {
@@ -4139,23 +4169,28 @@ int main() {
                 vita2d_draw_texture_scale(icon_tex[ICON_CAM_GRID], left_cx - 14.0f, gbtn_cy - 14.0f, sc, sc);
             }
 
-            // Botón Flash Frontal con Icono Vectorial Real
-            if (cam_dev == SCE_CAMERA_DEVICE_FRONT) {
-                float flbtn_cy = 106.0f;
-                vita2d_draw_rectangle(left_cx - btn_r, flbtn_cy - btn_r, btn_r * 2.0f, btn_r * 2.0f, RGBA8(14, 18, 34, 235));
-                unsigned int fl_border = (front_flash_mode == FRONT_FLASH_SCREEN) ? RGBA8(255, 214, 10, 240) :
-                                         ((front_flash_mode == FRONT_FLASH_BORDER) ? RGBA8(0, 210, 255, 240) : RGBA8(255, 255, 255, 40));
-                vita2d_draw_rectangle(left_cx - btn_r, flbtn_cy - btn_r, btn_r * 2.0f, 1.5f, fl_border);
-                vita2d_draw_rectangle(left_cx - btn_r, flbtn_cy + btn_r - 1.5f, btn_r * 2.0f, 1.5f, fl_border);
-                vita2d_draw_rectangle(left_cx - btn_r, flbtn_cy - btn_r, 1.5f, btn_r * 2.0f, fl_border);
-                vita2d_draw_rectangle(left_cx + btn_r - 1.5f, flbtn_cy - btn_r, 1.5f, btn_r * 2.0f, fl_border);
+            // Botón Flash con Icono Vectorial Real (Siempre visible, desactivado en trasera)
+            float flbtn_cy = 106.0f;
+            vita2d_draw_rectangle(left_cx - btn_r, flbtn_cy - btn_r, btn_r * 2.0f, btn_r * 2.0f, RGBA8(14, 18, 34, 235));
+            unsigned int fl_border;
+            IconId cur_fl_icon;
+            if (cam_dev == SCE_CAMERA_DEVICE_BACK) {
+                fl_border = RGBA8(255, 255, 255, 25);
+                cur_fl_icon = ICON_CAM_FLASH_OFF;
+            } else {
+                fl_border = (front_flash_mode == FRONT_FLASH_SCREEN) ? RGBA8(255, 214, 10, 240) :
+                            ((front_flash_mode == FRONT_FLASH_BORDER) ? RGBA8(0, 210, 255, 240) : RGBA8(255, 255, 255, 40));
+                cur_fl_icon = (front_flash_mode == FRONT_FLASH_SCREEN) ? ICON_CAM_FLASH_SCREEN :
+                             ((front_flash_mode == FRONT_FLASH_BORDER) ? ICON_CAM_FLASH_RING : ICON_CAM_FLASH_OFF);
+            }
+            vita2d_draw_rectangle(left_cx - btn_r, flbtn_cy - btn_r, btn_r * 2.0f, 1.5f, fl_border);
+            vita2d_draw_rectangle(left_cx - btn_r, flbtn_cy + btn_r - 1.5f, btn_r * 2.0f, 1.5f, fl_border);
+            vita2d_draw_rectangle(left_cx - btn_r, flbtn_cy - btn_r, 1.5f, btn_r * 2.0f, fl_border);
+            vita2d_draw_rectangle(left_cx + btn_r - 1.5f, flbtn_cy - btn_r, 1.5f, btn_r * 2.0f, fl_border);
 
-                IconId cur_fl_icon = (front_flash_mode == FRONT_FLASH_SCREEN) ? ICON_CAM_FLASH_SCREEN :
-                                     ((front_flash_mode == FRONT_FLASH_BORDER) ? ICON_CAM_FLASH_RING : ICON_CAM_FLASH_OFF);
-                if (icon_tex[cur_fl_icon]) {
-                    float sc = 28.0f / (float)vita2d_texture_get_height(icon_tex[cur_fl_icon]);
-                    vita2d_draw_texture_scale(icon_tex[cur_fl_icon], left_cx - 14.0f, flbtn_cy - 14.0f, sc, sc);
-                }
+            if (icon_tex[cur_fl_icon]) {
+                float sc = 28.0f / (float)vita2d_texture_get_height(icon_tex[cur_fl_icon]);
+                vita2d_draw_texture_scale(icon_tex[cur_fl_icon], left_cx - 14.0f, flbtn_cy - 14.0f, sc, sc);
             }
 
             // Botón Marca de Agua con Icono Vectorial Real
