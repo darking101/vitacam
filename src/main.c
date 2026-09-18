@@ -2452,7 +2452,6 @@ static void handle_camera_touch() {
                         status_msg_color = RGBA8(0, 220, 255, 255);
                     }
                     status_msg_timer = 90;
-                    if (sound_enabled) sound_req_beep = 1;
                 }
                 // 5e. Botón Ráfaga - Barra Lateral Izquierda (y: 309 - 366)
                 else if (tx >= 0 && tx <= 118 && ty >= 309 && ty <= 366) {
@@ -2468,7 +2467,6 @@ static void handle_camera_touch() {
                         status_msg_color = RGBA8(0, 220, 255, 255);
                     }
                     status_msg_timer = 90;
-                    if (sound_enabled) sound_req_beep = 1;
                 }
                 // 6. Botón Grabación de Video - Barra Lateral Derecha (x: 842 - 960, abajo del obturador)
                 else if (tx >= 842 && tx <= 960 && ty >= 345 && ty <= 425) {
