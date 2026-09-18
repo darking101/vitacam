@@ -37,12 +37,16 @@ def upload_vpk(ip=VITA_IP, port=VITA_PORT, local_file=LOCAL_VPK, remote_file=REM
             except Exception as ee:
                 print("Nota: No se pudo escribir eboot directo (la app puede estar en ejecución o ruta distinta):", ee)
 
-        # Actualizar recursos de LiveArea
+        # Actualizar recursos de LiveArea e iconos
         livearea_files = [
             ("sce_sys/icon0.png", "ux0:/app/VCAM00001/sce_sys/icon0.png"),
             ("sce_sys/livearea/contents/bg.png", "ux0:/app/VCAM00001/sce_sys/livearea/contents/bg.png"),
             ("sce_sys/livearea/contents/startup.png", "ux0:/app/VCAM00001/sce_sys/livearea/contents/startup.png"),
             ("sce_sys/livearea/contents/template.xml", "ux0:/app/VCAM00001/sce_sys/livearea/contents/template.xml"),
+            ("sce_sys/icons/cam_sound_on.png", "ux0:/app/VCAM00001/sce_sys/icons/cam_sound_on.png"),
+            ("sce_sys/icons/cam_sound_off.png", "ux0:/app/VCAM00001/sce_sys/icons/cam_sound_off.png"),
+            ("sce_sys/icons/cam_timer.png", "ux0:/app/VCAM00001/sce_sys/icons/cam_timer.png"),
+            ("sce_sys/icons/cam_burst.png", "ux0:/app/VCAM00001/sce_sys/icons/cam_burst.png"),
         ]
         for l_src, r_dst in livearea_files:
             if os.path.exists(l_src):

@@ -387,6 +387,10 @@ static const char *HTML_PAGE =
 "      <svg viewBox=\"0 0 24 24\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path><polyline points=\"7 10 12 15 17 10\"></polyline><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"></line></svg>\n"
 "      <span>Descargar</span>\n"
 "    </button>\n"
+"    <button class=\"btn-glass\" onclick=\"deleteSelected()\" style=\"background: rgba(255, 69, 58, 0.2); border-color: rgba(255, 69, 58, 0.5); color: #ff453a;\">\n"
+"      <svg viewBox=\"0 0 24 24\"><polyline points=\"3 6 5 6 21 6\"></polyline><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"></path></svg>\n"
+"      <span>Eliminar</span>\n"
+"    </button>\n"
 "    <button class=\"btn-cancel\" onclick=\"toggleSelectMode()\">Cancelar</button>\n"
 "  </div>\n"
 "</div>\n"
@@ -403,6 +407,9 @@ static const char *HTML_PAGE =
 "    <a class=\"icon-btn\" id=\"lb-dl-btn\" href=\"#\" download=\"photo.jpg\">\n"
 "      <svg viewBox=\"0 0 24 24\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path><polyline points=\"7 10 12 15 17 10\"></polyline><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"></line></svg>\n"
 "    </a>\n"
+"    <button class=\"icon-btn\" id=\"lb-del-btn\" onclick=\"deleteCurrentLightboxItem()\" style=\"color: #ff453a;\">\n"
+"      <svg viewBox=\"0 0 24 24\"><polyline points=\"3 6 5 6 21 6\"></polyline><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"></path></svg>\n"
+"    </button>\n"
 "  </div>\n"
 "  <div class=\"lb-media-wrap\" id=\"lb-media-wrap\" onclick=\"event.stopPropagation()\"></div>\n"
 "  <div class=\"lb-bottom\" onclick=\"event.stopPropagation()\"></div>\n"
@@ -413,6 +420,7 @@ static const char *HTML_PAGE =
 "let currentFilter = 'all';\n"
 "let isSelectMode = false;\n"
 "let selectedItems = new Set();\n"
+"let currentLightboxPath = null;\n"
 "async function loadData() {\n"
 "  try {\n"
 "    const res = await fetch('/api/list');\n"
@@ -544,6 +552,7 @@ static const char *HTML_PAGE =
 "  const dl = document.getElementById('lb-dl-btn');\n"
 "  dl.href = `/download?path=${encodeURIComponent(path)}`;\n"
 "  dl.download = item ? item.name : 'media';\n"
+"  currentLightboxPath = path;\n"
 "  if (isVid) {\n"
 "    wrap.innerHTML = `<video class=\"lb-media\" src=\"/view?path=${encodeURIComponent(path)}\" controls autoplay></video>`;\n"
 "  } else {\n"
@@ -554,6 +563,52 @@ static const char *HTML_PAGE =
 "function closeLightbox() {\n"
 "  document.getElementById('lightbox').classList.remove('active');\n"
 "  document.getElementById('lb-media-wrap').innerHTML = '';\n"
+"  currentLightboxPath = null;\n"
+"}\n"
+"async function deleteCurrentLightboxItem() {\n"
+"  if (!currentLightboxPath) return;\n"
+"  const path = currentLightboxPath;\n"
+"  if (!confirm('¿Eliminar este elemento de la PS Vita de forma permanente?')) return;\n"
+"  try {\n"
+"    const res = await fetch(`/api/delete?path=${encodeURIComponent(path)}`);\n"
+"    const data = await res.json();\n"
+"    if (data && data.success) {\n"
+"      allItems = allItems.filter(i => i.path !== path);\n"
+"      selectedItems.delete(path);\n"
+"      closeLightbox();\n"
+"      renderGallery();\n"
+"      showToast('Elemento eliminado de la PS Vita');\n"
+"    } else {\n"
+"      showToast('Error al eliminar elemento');\n"
+"    }\n"
+"  } catch(e) {\n"
+"    showToast('Error de conexion');\n"
+"  }\n"
+"}\n"
+"async function deleteSelected() {\n"
+"  const cnt = selectedItems.size;\n"
+"  if (cnt === 0) return;\n"
+"  const msg = cnt === 1\n"
+"    ? '¿Eliminar el elemento seleccionado de la PS Vita?'\n"
+"    : `¿Eliminar los ${cnt} elementos seleccionados de la PS Vita de forma permanente?`;\n"
+"  if (!confirm(msg)) return;\n"
+"  showToast(`Eliminando ${cnt} elemento(s)...`);\n"
+"  const paths = Array.from(selectedItems);\n"
+"  let deleted = 0;\n"
+"  for (const p of paths) {\n"
+"    try {\n"
+"      const res = await fetch(`/api/delete?path=${encodeURIComponent(p)}`);\n"
+"      const data = await res.json();\n"
+"      if (data && data.success) {\n"
+"        deleted++;\n"
+"        allItems = allItems.filter(i => i.path !== p);\n"
+"      }\n"
+"    } catch(e) {}\n"
+"  }\n"
+"  selectedItems.clear();\n"
+"  toggleSelectMode();\n"
+"  renderGallery();\n"
+"  showToast(`${deleted} elemento(s) eliminados`);\n"
 "}\n"
 "async function downloadSelected() {\n"
 "  const list = Array.from(selectedItems);\n"
@@ -1088,6 +1143,53 @@ static void handle_http_client(int client_sock) {
             sceNetSend(client_sock, dbg, dbg_len, 0);
             free(dbg);
         }
+    }
+    else if (strncmp(uri, "/api/delete", 11) == 0) {
+        const char *q = strstr(uri, "?path=");
+        char filepath[256] = "";
+        if (q) {
+            url_decode(filepath, q + 6);
+        }
+
+        int allowed = 0;
+        if (filepath[0] != '\0') {
+            if (strncasecmp(filepath, "ux0:data/vitacam", 16) == 0 ||
+                strncasecmp(filepath, "ux0:picture/CAMERA", 18) == 0 ||
+                strncasecmp(filepath, "ux0:picture/SCREENSHOT", 22) == 0) {
+                if (!strstr(filepath, "..")) {
+                    allowed = 1;
+                }
+            }
+        }
+
+        int del_ok = 0;
+        if (allowed) {
+            if (sceIoRemove(filepath) >= 0) {
+                del_ok = 1;
+                int flen = strlen(filepath);
+                if (flen > 4 && strcasecmp(filepath + flen - 4, ".avi") == 0) {
+                    char thumb[256];
+                    strncpy(thumb, filepath, sizeof(thumb) - 1);
+                    thumb[sizeof(thumb) - 1] = '\0';
+                    strcpy(thumb + flen - 4, ".jpg");
+                    sceIoRemove(thumb);
+                }
+            }
+        }
+
+        char resp[128];
+        snprintf(resp, sizeof(resp), "{\"success\":%s}", del_ok ? "true" : "false");
+        char header[256];
+        int rlen = strlen(resp);
+        snprintf(header, sizeof(header),
+            "HTTP/1.1 %s\r\n"
+            "Content-Type: application/json\r\n"
+            "Content-Length: %d\r\n"
+            "Access-Control-Allow-Origin: *\r\n"
+            "Connection: close\r\n\r\n",
+            del_ok ? "200 OK" : "400 Bad Request", rlen);
+        sceNetSend(client_sock, header, strlen(header), 0);
+        sceNetSend(client_sock, resp, rlen, 0);
     }
     else if (strncmp(uri, "/view?path=", 11) == 0 || strncmp(uri, "/download?path=", 15) == 0 || strncmp(uri, "/thumb?path=", 12) == 0) {
         int is_download = (strncmp(uri, "/download?path=", 15) == 0);

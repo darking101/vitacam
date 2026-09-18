@@ -23,6 +23,7 @@ target_link_libraries(vitacam
     SceCommonDialog_stub
     ScePgf_stub
     SceAudioIn_stub
+    SceAudio_stub
     SceNet_stub
     SceNetCtl_stub
     png
@@ -59,5 +60,9 @@ vita_create_vpk(vitacam.vpk "VCAM00001" eboot.bin
     FILE sce_sys/icons/cam_flash_ring.png sce_sys/icons/cam_flash_ring.png
     FILE sce_sys/icons/cam_grid.png     sce_sys/icons/cam_grid.png
     FILE sce_sys/icons/cam_wm.png       sce_sys/icons/cam_wm.png
+    FILE sce_sys/icons/cam_sound_on.png sce_sys/icons/cam_sound_on.png
+    FILE sce_sys/icons/cam_sound_off.png sce_sys/icons/cam_sound_off.png
+    FILE sce_sys/icons/cam_timer.png    sce_sys/icons/cam_timer.png
+    FILE sce_sys/icons/cam_burst.png    sce_sys/icons/cam_burst.png
 )
 

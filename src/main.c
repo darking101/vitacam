@@ -25,6 +25,7 @@
 #include <psp2/io/devctl.h>
 #include <psp2/appmgr.h>
 #include <psp2/audioin.h>
+#include <psp2/audioout.h>
 #include <sys/statvfs.h>
 #include <malloc.h>
 #include <vita2d.h>
@@ -89,21 +90,106 @@ static int show_grid = 1;
 // ── Configuración Persistente (Ajustes de Usuario) ────────────────────────
 typedef struct {
     uint32_t magic;         // 0x5643414D ("VCAM")
-    uint32_t version;       // 1
+    uint32_t version;       // 2
     int last_cam_dev;       // 0: BACK, 1: FRONT
     int front_flash_mode;   // 0: OFF, 1: SCREEN, 2: RING
     int show_grid;          // 0: OFF, 1: ON
-    int reserved[11];
+    int sound_enabled;      // 0: OFF, 1: ON
+    int timer_mode;         // 0: OFF, 3: 3s, 5: 5s, 10: 10s
+    int burst_mode;         // 0: OFF, 3: 3x, 5: 5x
+    int reserved[8];
 } VitaCamConfig;
+
+// ── Variables de Sonido, Temporizador y Ráfaga ────────────────────────────
+static int sound_enabled = 1;
+static volatile int sound_running = 1;
+static volatile int sound_req_shutter = 0;
+static volatile int sound_req_beep = 0;
+static SceUID sound_thid = -1;
+
+static int timer_mode = 0;          // 0: OFF, 3: 3s, 5: 5s, 10: 10s
+static int timer_active = 0;
+static int timer_countdown_sec = 0;
+static uint64_t timer_start_time = 0;
+static int timer_last_beep_sec = -1;
+
+static int burst_mode = 0;          // 0: OFF, 3: 3x, 5: 5x
+static int burst_remaining = 0;
+
+static int sound_worker_thread(SceSize args, void *argp) {
+    int port = sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN, 512, 44100, SCE_AUDIO_OUT_MODE_MONO);
+    if (port < 0) return 0;
+
+    while (sound_running) {
+        if (sound_req_shutter && sound_enabled) {
+            sound_req_shutter = 0;
+            const int total = 44100 * 110 / 1000;
+            int16_t block[512];
+            for (int offset = 0; offset < total; offset += 512) {
+                for (int i = 0; i < 512; i++) {
+                    int s_idx = offset + i;
+                    if (s_idx < total) {
+                        float t = (float)s_idx / 44100.0f;
+                        float s = 0.0f;
+                        if (s_idx < 1600) {
+                            float env = expf(-t * 130.0f);
+                            s = sinf(6.28318f * 1200.0f * t) * 0.7f + sinf(6.28318f * 400.0f * t) * 0.3f;
+                            block[i] = (int16_t)(s * env * 28000.0f);
+                        } else if (s_idx < 2200) {
+                            block[i] = 0;
+                        } else {
+                            float t2 = (float)(s_idx - 2200) / 44100.0f;
+                            float env = expf(-t2 * 100.0f);
+                            s = sinf(6.28318f * 700.0f * t2) * 0.6f + sinf(6.28318f * 300.0f * t2) * 0.4f;
+                            block[i] = (int16_t)(s * env * 24000.0f);
+                        }
+                    } else {
+                        block[i] = 0;
+                    }
+                }
+                sceAudioOutOutput(port, block);
+            }
+        } else if (sound_req_beep && sound_enabled) {
+            int is_final = (sound_req_beep == 2);
+            sound_req_beep = 0;
+            int dur_ms = is_final ? 120 : 60;
+            float freq = is_final ? 2000.0f : 1000.0f;
+            int total = 44100 * dur_ms / 1000;
+            int16_t block[512];
+            for (int offset = 0; offset < total; offset += 512) {
+                for (int i = 0; i < 512; i++) {
+                    int s_idx = offset + i;
+                    if (s_idx < total) {
+                        float t = (float)s_idx / 44100.0f;
+                        float s = sinf(6.28318f * freq * t);
+                        block[i] = (int16_t)(s * 22000.0f);
+                    } else {
+                        block[i] = 0;
+                    }
+                }
+                sceAudioOutOutput(port, block);
+            }
+        } else {
+            sound_req_shutter = 0;
+            sound_req_beep = 0;
+            sceKernelDelayThread(10000);
+        }
+    }
+    sceAudioOutReleasePort(port);
+    return 0;
+}
 
 static void save_user_settings(void) {
     VitaCamConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.magic = 0x5643414D;
-    cfg.version = 1;
+    cfg.version = 2;
     cfg.last_cam_dev = cam_dev;
     cfg.front_flash_mode = (int)front_flash_mode;
     cfg.show_grid = show_grid;
+    cfg.sound_enabled = sound_enabled;
+    cfg.timer_mode = timer_mode;
+    cfg.burst_mode = burst_mode;
 
     sceIoMkdir("ux0:data", 0777);
     sceIoMkdir("ux0:data/VitaCam", 0777);
@@ -115,6 +201,9 @@ static void save_user_settings(void) {
 }
 
 static void load_user_settings(void) {
+    sound_enabled = 1;
+    timer_mode = 0;
+    burst_mode = 0;
     watermark_enabled = 0; // Regla estricta: Siempre apagada por defecto
     VitaCamConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
@@ -130,16 +219,48 @@ static void load_user_settings(void) {
                 front_flash_mode = (FrontFlashMode)cfg.front_flash_mode;
             }
             show_grid = (cfg.show_grid != 0) ? 1 : 0;
+            if (cfg.version >= 2) {
+                sound_enabled = (cfg.sound_enabled != 0) ? 1 : 0;
+                if (cfg.timer_mode == 0 || cfg.timer_mode == 3 || cfg.timer_mode == 5 || cfg.timer_mode == 10) {
+                    timer_mode = cfg.timer_mode;
+                }
+                if (cfg.burst_mode == 0 || cfg.burst_mode == 3 || cfg.burst_mode == 5) {
+                    burst_mode = cfg.burst_mode;
+                }
+            }
         }
     }
 }
 
-static void trigger_camera_shot(void) {
+static void execute_actual_shot(void) {
     shutter_pressed_anim = 8;
+    sound_req_shutter = 1;
+    if (burst_mode > 0 && burst_remaining <= 0) {
+        burst_remaining = burst_mode;
+    }
     if (cam_dev == SCE_CAMERA_DEVICE_FRONT && front_flash_mode != FRONT_FLASH_OFF) {
         flash_trigger_anim = 16;
     } else {
         capture_requested = 1;
+    }
+}
+
+static void trigger_camera_shot(void) {
+    if (timer_active) {
+        timer_active = 0;
+        snprintf(status_msg, sizeof(status_msg), "Temporizador cancelado");
+        status_msg_color = RGBA8(255, 100, 100, 255);
+        status_msg_timer = 60;
+        return;
+    }
+    if (timer_mode > 0) {
+        timer_active = 1;
+        timer_countdown_sec = timer_mode;
+        timer_start_time = sceKernelGetProcessTimeWide();
+        timer_last_beep_sec = timer_mode;
+        sound_req_beep = 1;
+    } else {
+        execute_actual_shot();
     }
 }
 
@@ -312,6 +433,10 @@ typedef enum {
     ICON_CAM_FLASH_RING,
     ICON_CAM_GRID,
     ICON_CAM_WM,
+    ICON_CAM_SOUND_ON,
+    ICON_CAM_SOUND_OFF,
+    ICON_CAM_TIMER,
+    ICON_CAM_BURST,
     ICON_COUNT
 } IconId;
 
@@ -333,6 +458,10 @@ static const char *icon_paths[ICON_COUNT] = {
     "app0:sce_sys/icons/cam_flash_ring.png",
     "app0:sce_sys/icons/cam_grid.png",
     "app0:sce_sys/icons/cam_wm.png",
+    "app0:sce_sys/icons/cam_sound_on.png",
+    "app0:sce_sys/icons/cam_sound_off.png",
+    "app0:sce_sys/icons/cam_timer.png",
+    "app0:sce_sys/icons/cam_burst.png",
 };
 
 // Variables para detección precisa de toques físicos y táctiles
@@ -2198,6 +2327,15 @@ static void handle_camera_touch() {
             int ty = touch_start_y;
 
             if (!touch_is_dragging) {
+                if (timer_active) {
+                    timer_active = 0;
+                    snprintf(status_msg, sizeof(status_msg), "Temporizador cancelado");
+                    status_msg_color = RGBA8(255, 100, 100, 255);
+                    status_msg_timer = 60;
+                    touch_active = 0;
+                    return;
+                }
+
                 // 1. Botón de Obturador (Shutter) - Barra Lateral Derecha (x: 842 - 960)
                 if (tx >= 842 && tx <= 960 && ty >= 210 && ty <= 335) {
                     trigger_camera_shot();
@@ -2231,12 +2369,54 @@ static void handle_camera_touch() {
                     }
                     status_msg_timer = 90;
                 }
-                // 5b. Botón Marca de Agua (Watermark) - Barra Lateral Izquierda (x: 0 - 118, y: 135 - 195)
-                else if (tx >= 0 && tx <= 118 && ty >= 135 && ty <= 195) {
+                // 5b. Botón Marca de Agua (Watermark) - Barra Lateral Izquierda (x: 0 - 118, y: 135 - 193)
+                else if (tx >= 0 && tx <= 118 && ty >= 135 && ty <= 193) {
                     watermark_enabled = !watermark_enabled;
                     snprintf(status_msg, sizeof(status_msg), "Marca de Agua: %s (Tomada con PS Vita)", watermark_enabled ? "Activada" : "Desactivada");
                     status_msg_color = watermark_enabled ? RGBA8(0, 220, 255, 255) : RGBA8(180, 190, 210, 255);
                     status_msg_timer = 90;
+                }
+                // 5c. Botón Sonido de Obturador (Mute On/Off) - Barra Lateral Izquierda (y: 194 - 250)
+                else if (tx >= 0 && tx <= 118 && ty >= 194 && ty <= 250) {
+                    sound_enabled = !sound_enabled;
+                    save_user_settings();
+                    snprintf(status_msg, sizeof(status_msg), "Sonido Obturador: %s", sound_enabled ? "Activado" : "Silenciado");
+                    status_msg_color = sound_enabled ? RGBA8(0, 220, 255, 255) : RGBA8(255, 100, 100, 255);
+                    status_msg_timer = 90;
+                    if (sound_enabled) sound_req_beep = 1;
+                }
+                // 5d. Botón Temporizador - Barra Lateral Izquierda (y: 251 - 308)
+                else if (tx >= 0 && tx <= 118 && ty >= 251 && ty <= 308) {
+                    if (timer_mode == 0) timer_mode = 3;
+                    else if (timer_mode == 3) timer_mode = 5;
+                    else if (timer_mode == 5) timer_mode = 10;
+                    else timer_mode = 0;
+                    save_user_settings();
+                    if (timer_mode == 0) {
+                        snprintf(status_msg, sizeof(status_msg), "Temporizador: Desactivado");
+                        status_msg_color = RGBA8(180, 190, 210, 255);
+                    } else {
+                        snprintf(status_msg, sizeof(status_msg), "Temporizador: %d Segundos", timer_mode);
+                        status_msg_color = RGBA8(0, 220, 255, 255);
+                    }
+                    status_msg_timer = 90;
+                    if (sound_enabled) sound_req_beep = 1;
+                }
+                // 5e. Botón Ráfaga - Barra Lateral Izquierda (y: 309 - 366)
+                else if (tx >= 0 && tx <= 118 && ty >= 309 && ty <= 366) {
+                    if (burst_mode == 0) burst_mode = 3;
+                    else if (burst_mode == 3) burst_mode = 5;
+                    else burst_mode = 0;
+                    save_user_settings();
+                    if (burst_mode == 0) {
+                        snprintf(status_msg, sizeof(status_msg), "Ráfaga: Desactivada");
+                        status_msg_color = RGBA8(180, 190, 210, 255);
+                    } else {
+                        snprintf(status_msg, sizeof(status_msg), "Ráfaga: %d Fotos Consecutivas", burst_mode);
+                        status_msg_color = RGBA8(0, 220, 255, 255);
+                    }
+                    status_msg_timer = 90;
+                    if (sound_enabled) sound_req_beep = 1;
                 }
                 // 6. Botón Grabación de Video - Barra Lateral Derecha (x: 842 - 960, abajo del obturador)
                 else if (tx >= 842 && tx <= 960 && ty >= 345 && ty <= 425) {
@@ -2971,13 +3151,28 @@ static void capture_and_save_photo() {
             bname = bname ? bname + 1 : filename;
 
             if (written == total_expected) {
-                snprintf(status_msg, sizeof(status_msg), "FOTO GUARDADA (%d KB) • EXIF", total_expected / 1024);
+                if (burst_remaining > 1) {
+                    snprintf(status_msg, sizeof(status_msg), "RAFAGA: FOTO %d DE %d GUARDADA", burst_mode - burst_remaining + 1, burst_mode);
+                } else if (burst_mode > 0) {
+                    snprintf(status_msg, sizeof(status_msg), "RAFAGA COMPLETADA (%d FOTOS) • EXIF", burst_mode);
+                } else {
+                    snprintf(status_msg, sizeof(status_msg), "FOTO GUARDADA (%d KB) • EXIF", total_expected / 1024);
+                }
                 status_msg_color = RGBA8(60, 255, 120, 255);
-                status_msg_timer = 120;
+                status_msg_timer = 90;
                 if (cam_last_thumb_tex) {
                     load_jpeg_into_thumb_texture(filename, cam_last_thumb_tex);
                 }
                 gallery_scan_directory();
+
+                if (burst_remaining > 1) {
+                    burst_remaining--;
+                    sound_req_shutter = 1;
+                    shutter_pressed_anim = 6;
+                    capture_requested = 1;
+                } else {
+                    burst_remaining = 0;
+                }
             } else {
                 snprintf(status_msg, sizeof(status_msg), "ERROR IO: Escritos %d de %d bytes", written, total_expected);
                 status_msg_color = RGBA8(255, 60, 60, 255);
@@ -3491,6 +3686,13 @@ int main() {
         sceKernelStartThread(cam_thid, 0, NULL);
     }
 
+    // 8b. Lanzar hilo trabajador de sonido y audio
+    sound_running = 1;
+    sound_thid = sceKernelCreateThread("VitaCam_Sound", sound_worker_thread, 0x10000100, 0x8000, 0, 0, NULL);
+    if (sound_thid >= 0) {
+        sceKernelStartThread(sound_thid, 0, NULL);
+    }
+
     cam_last_thumb_tex = vita2d_create_empty_texture(THUMB_WIDTH, THUMB_HEIGHT);
     if (cam_last_thumb_tex) {
         vita2d_texture_set_filters(cam_last_thumb_tex, SCE_GXM_TEXTURE_FILTER_LINEAR, SCE_GXM_TEXTURE_FILTER_LINEAR);
@@ -3526,6 +3728,31 @@ int main() {
         // =================================================================
         if (app_mode == APP_MODE_CAMERA) {
             handle_camera_touch();
+
+            // Procesar cuenta regresiva del Temporizador si está activo
+            if (timer_active) {
+                if (pressed & SCE_CTRL_CIRCLE) {
+                    timer_active = 0;
+                    snprintf(status_msg, sizeof(status_msg), "Temporizador cancelado");
+                    status_msg_color = RGBA8(255, 100, 100, 255);
+                    status_msg_timer = 60;
+                } else {
+                    uint64_t cur_t = sceKernelGetProcessTimeWide();
+                    uint64_t elapsed_us = cur_t - timer_start_time;
+                    int elapsed_s = (int)(elapsed_us / 1000000);
+                    int rem_s = timer_mode - elapsed_s;
+                    if (rem_s != timer_last_beep_sec && rem_s > 0) {
+                        timer_last_beep_sec = rem_s;
+                        sound_req_beep = (rem_s == 1) ? 2 : 1;
+                    }
+                    if (rem_s <= 0) {
+                        timer_active = 0;
+                        execute_actual_shot();
+                    } else {
+                        timer_countdown_sec = rem_s;
+                    }
+                }
+            }
 
             if (pressed & SCE_CTRL_SELECT) {
                 gallery_enter();
@@ -3917,6 +4144,60 @@ int main() {
                 vita2d_draw_texture_scale(icon_tex[ICON_CAM_WM], left_cx - 14.0f, wmbtn_cy - 14.0f, sc, sc);
             }
 
+            // Botón Sonido de Obturador (Mute On/Off) con Icono Real
+            float snd_cy = 222.0f;
+            vita2d_draw_rectangle(left_cx - btn_r, snd_cy - btn_r, btn_r * 2.0f, btn_r * 2.0f, RGBA8(14, 18, 34, 235));
+            unsigned int snd_border = sound_enabled ? RGBA8(0, 210, 255, 240) : RGBA8(255, 60, 60, 220);
+            vita2d_draw_rectangle(left_cx - btn_r, snd_cy - btn_r, btn_r * 2.0f, 1.5f, snd_border);
+            vita2d_draw_rectangle(left_cx - btn_r, snd_cy + btn_r - 1.5f, btn_r * 2.0f, 1.5f, snd_border);
+            vita2d_draw_rectangle(left_cx - btn_r, snd_cy - btn_r, 1.5f, btn_r * 2.0f, snd_border);
+            vita2d_draw_rectangle(left_cx + btn_r - 1.5f, snd_cy - btn_r, 1.5f, btn_r * 2.0f, snd_border);
+            IconId snd_icon = sound_enabled ? ICON_CAM_SOUND_ON : ICON_CAM_SOUND_OFF;
+            if (icon_tex[snd_icon]) {
+                float sc = 28.0f / (float)vita2d_texture_get_height(icon_tex[snd_icon]);
+                vita2d_draw_texture_scale(icon_tex[snd_icon], left_cx - 14.0f, snd_cy - 14.0f, sc, sc);
+            }
+
+            // Botón Temporizador con Icono Real y Badge de Tiempo
+            float tmr_cy = 280.0f;
+            vita2d_draw_rectangle(left_cx - btn_r, tmr_cy - btn_r, btn_r * 2.0f, btn_r * 2.0f, RGBA8(14, 18, 34, 235));
+            unsigned int tmr_border = (timer_mode > 0) ? RGBA8(0, 210, 255, 240) : RGBA8(255, 255, 255, 40);
+            vita2d_draw_rectangle(left_cx - btn_r, tmr_cy - btn_r, btn_r * 2.0f, 1.5f, tmr_border);
+            vita2d_draw_rectangle(left_cx - btn_r, tmr_cy + btn_r - 1.5f, btn_r * 2.0f, 1.5f, tmr_border);
+            vita2d_draw_rectangle(left_cx - btn_r, tmr_cy - btn_r, 1.5f, btn_r * 2.0f, tmr_border);
+            vita2d_draw_rectangle(left_cx + btn_r - 1.5f, tmr_cy - btn_r, 1.5f, btn_r * 2.0f, tmr_border);
+            if (icon_tex[ICON_CAM_TIMER]) {
+                float sc = 26.0f / (float)vita2d_texture_get_height(icon_tex[ICON_CAM_TIMER]);
+                vita2d_draw_texture_scale(icon_tex[ICON_CAM_TIMER], left_cx - 13.0f, tmr_cy - 13.0f, sc, sc);
+            }
+            if (timer_mode > 0 && pgf) {
+                char tlabel[8];
+                snprintf(tlabel, sizeof(tlabel), "%ds", timer_mode);
+                float tw = vita2d_pgf_text_width(pgf, 0.45f, tlabel);
+                vita2d_draw_rectangle(left_cx + 2.0f, tmr_cy + 5.0f, tw + 4.0f, 12.0f, RGBA8(0, 210, 255, 240));
+                vita2d_pgf_draw_text(pgf, (int)(left_cx + 4.0f), (int)(tmr_cy + 15.0f), RGBA8(10, 15, 30, 255), 0.45f, tlabel);
+            }
+
+            // Botón Ráfaga con Icono Real y Badge de Disparos
+            float rst_cy = 338.0f;
+            vita2d_draw_rectangle(left_cx - btn_r, rst_cy - btn_r, btn_r * 2.0f, btn_r * 2.0f, RGBA8(14, 18, 34, 235));
+            unsigned int rst_border = (burst_mode > 0) ? RGBA8(0, 210, 255, 240) : RGBA8(255, 255, 255, 40);
+            vita2d_draw_rectangle(left_cx - btn_r, rst_cy - btn_r, btn_r * 2.0f, 1.5f, rst_border);
+            vita2d_draw_rectangle(left_cx - btn_r, rst_cy + btn_r - 1.5f, btn_r * 2.0f, 1.5f, rst_border);
+            vita2d_draw_rectangle(left_cx - btn_r, rst_cy - btn_r, 1.5f, btn_r * 2.0f, rst_border);
+            vita2d_draw_rectangle(left_cx + btn_r - 1.5f, rst_cy - btn_r, 1.5f, btn_r * 2.0f, rst_border);
+            if (icon_tex[ICON_CAM_BURST]) {
+                float sc = 26.0f / (float)vita2d_texture_get_height(icon_tex[ICON_CAM_BURST]);
+                vita2d_draw_texture_scale(icon_tex[ICON_CAM_BURST], left_cx - 13.0f, rst_cy - 13.0f, sc, sc);
+            }
+            if (burst_mode > 0 && pgf) {
+                char blabel[8];
+                snprintf(blabel, sizeof(blabel), "%dx", burst_mode);
+                float tw = vita2d_pgf_text_width(pgf, 0.45f, blabel);
+                vita2d_draw_rectangle(left_cx + 2.0f, rst_cy + 5.0f, tw + 4.0f, 12.0f, RGBA8(0, 210, 255, 240));
+                vita2d_pgf_draw_text(pgf, (int)(left_cx + 4.0f), (int)(rst_cy + 15.0f), RGBA8(10, 15, 30, 255), 0.45f, blabel);
+            }
+
             // Burbuja de Galería en Barra Izquierda Inferior (Aspecto 4:3 con marco nítido)
             float gal_x = 29.0f, gal_y = 461.0f, gal_w = 60.0f, gal_h = 46.0f;
             vita2d_draw_rectangle(gal_x, gal_y, gal_w, gal_h, RGBA8(14, 18, 34, 235));
@@ -4052,6 +4333,33 @@ int main() {
                 vita2d_draw_rectangle(banner_x, banner_y, banner_w, banner_h, RGBA8(12, 16, 34, 230));
                 vita2d_draw_rectangle(banner_x, banner_y + banner_h - 2.0f, banner_w, 2.0f, status_msg_color);
                 vita2d_pgf_draw_text(pgf, banner_x + 16, banner_y + 22, status_msg_color, 0.78f, status_msg);
+            }
+
+            // Cuenta regresiva del Temporizador en pantalla (Overlay animado)
+            if (timer_active && pgf) {
+                float ccx = 480.0f, ccy = 272.0f;
+                uint64_t phase = sceKernelGetProcessTimeWide() % 1000000;
+                float pulse = 1.0f + 0.12f * sinf((float)phase / 1000000.0f * 3.14159f);
+                float cr = 64.0f * pulse;
+
+                // Fondo oscurecido con viñeta para legibilidad
+                vita2d_draw_rectangle(0.0f, 0.0f, 960.0f, 544.0f, RGBA8(0, 0, 0, 80));
+
+                // Anillo exterior brillante
+                vita2d_draw_rectangle(ccx - cr, ccy - cr, cr * 2.0f, cr * 2.0f, RGBA8(10, 14, 28, 230));
+                vita2d_draw_rectangle(ccx - cr, ccy - cr, cr * 2.0f, 2.5f, RGBA8(0, 210, 255, 255));
+                vita2d_draw_rectangle(ccx - cr, ccy + cr - 2.5f, cr * 2.0f, 2.5f, RGBA8(0, 210, 255, 255));
+                vita2d_draw_rectangle(ccx - cr, ccy - cr, 2.5f, cr * 2.0f, RGBA8(0, 210, 255, 255));
+                vita2d_draw_rectangle(ccx + cr - 2.5f, ccy - cr, 2.5f, cr * 2.0f, RGBA8(0, 210, 255, 255));
+
+                char num_str[8];
+                snprintf(num_str, sizeof(num_str), "%d", timer_countdown_sec);
+                float tw_n = vita2d_pgf_text_width(pgf, 2.4f, num_str);
+                vita2d_pgf_draw_text(pgf, (int)(ccx - tw_n * 0.5f), (int)ccy + 26, RGBA8(255, 255, 255, 255), 2.4f, num_str);
+
+                const char *hint = "[ O ] o tocar pantalla para cancelar";
+                float tw_h = vita2d_pgf_text_width(pgf, 0.72f, hint);
+                vita2d_pgf_draw_text(pgf, (int)(ccx - tw_h * 0.5f), (int)(ccy + cr + 38.0f), RGBA8(210, 225, 255, 230), 0.72f, hint);
             }
 
             vita2d_end_drawing();
@@ -4928,10 +5236,14 @@ skip_fullscreen_ui: ;
         }
     }
 
-    // 10. Detener hilo de cámara y liberar recursos limpiamente
+    // 10. Detener hilos de cámara y sonido, y liberar recursos limpiamente
     cam_thread_run = 0;
     if (cam_thid >= 0) {
         sceKernelWaitThreadEnd(cam_thid, NULL, NULL);
+    }
+    sound_running = 0;
+    if (sound_thid >= 0) {
+        sceKernelWaitThreadEnd(sound_thid, NULL, NULL);
     }
 
     sceCameraStop(cam_dev);
