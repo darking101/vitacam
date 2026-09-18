@@ -85,6 +85,16 @@ int webserver_is_enabled(void) {
     return server_enabled;
 }
 
+static volatile int g_files_changed = 0;
+
+int webserver_check_and_clear_files_changed(void) {
+    if (g_files_changed) {
+        g_files_changed = 0;
+        return 1;
+    }
+    return 0;
+}
+
 // ── Interfaz Web Samsung Gallery / Google Photos + Apple Glassmorphism ─────
 static const char *HTML_PAGE = 
 "<!DOCTYPE html>\n"
@@ -1166,6 +1176,7 @@ static void handle_http_client(int client_sock) {
         if (allowed) {
             if (sceIoRemove(filepath) >= 0) {
                 del_ok = 1;
+                g_files_changed = 1;
                 int flen = strlen(filepath);
                 if (flen > 4 && strcasecmp(filepath + flen - 4, ".avi") == 0) {
                     char thumb[256];

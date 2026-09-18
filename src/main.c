@@ -2230,6 +2230,28 @@ static void gallery_delete_selected() {
     }
 }
 
+static void gallery_refresh_after_external_change(void) {
+    gallery_scan_directory();
+    if (gallery_idx >= gallery_count) {
+        gallery_idx = gallery_count > 0 ? gallery_count - 1 : 0;
+    }
+    gallery_clear_selection();
+    gallery_invalidate_thumbnails();
+    update_camera_last_thumb();
+
+    float max_s = gallery_get_max_scroll();
+    if (gallery_target_scroll_y > max_s) gallery_target_scroll_y = max_s;
+    if (gallery_scroll_y > max_s) gallery_scroll_y = max_s;
+
+    if (gallery_view == GALLERY_VIEW_FULLSCREEN) {
+        if (gallery_count > 0) {
+            gallery_load_current_photo();
+        } else {
+            gallery_view = GALLERY_VIEW_GRID;
+        }
+    }
+}
+
 
 // =========================================================================
 // Procesamiento Táctil en Modo Cámara (Shutter, Flip, Zoom, Slider, Pro Bar)
@@ -3720,6 +3742,11 @@ int main() {
         old_pad = pad;
         sceCtrlPeekBufferPositive(0, &pad, 1);
         uint32_t pressed = pad.buttons & ~old_pad.buttons;
+
+        // Si se eliminaron fotos remotamente desde la Web App, sincronizar galería y miniaturas de la consola en vivo
+        if (webserver_check_and_clear_files_changed()) {
+            gallery_refresh_after_external_change();
+        }
 
         // START ya no sale de la app
 

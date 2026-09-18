@@ -16,6 +16,7 @@ void webserver_set_enabled(int enabled);
 const char *webserver_get_password(void);
 void webserver_set_password(const char *pwd);
 int webserver_is_enabled(void);
+int webserver_check_and_clear_files_changed(void);
 
 #ifdef __cplusplus
 }
